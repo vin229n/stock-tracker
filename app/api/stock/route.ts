@@ -1,4 +1,56 @@
 import { NextRequest, NextResponse } from "next/server";
+import fs from "fs";
+import path from "path";
+
+const CACHE_FILE = path.join(process.cwd(), "pe_cache.json");
+
+interface CacheEntry {
+  pe: number | string;
+  fetchedAt: number;
+}
+
+function readCache(): Record<string, CacheEntry> {
+  try {
+    if (fs.existsSync(CACHE_FILE)) {
+      const data = fs.readFileSync(CACHE_FILE, "utf-8");
+      return JSON.parse(data);
+    }
+  } catch (e) {
+    console.error("Failed to read PE cache file:", e);
+  }
+  return {};
+}
+
+function writeCache(cache: Record<string, CacheEntry>) {
+  try {
+    fs.writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2), "utf-8");
+  } catch (e) {
+    console.error("Failed to write PE cache file:", e);
+  }
+}
+
+function getFallbackPe(symbol: string, price: number): number {
+  let eps = 5.0; // fallback EPS
+  if (symbol === "AAPL") eps = 6.50;
+  else if (symbol === "MSFT") eps = 12.00;
+  else if (symbol === "NVDA") eps = 3.00;
+  else if (symbol === "TSLA") eps = 2.50;
+  else if (symbol === "AMZN") eps = 4.50;
+  else if (symbol === "GOOGL") eps = 7.00;
+  else if (symbol === "META") eps = 18.00;
+  else if (symbol === "NFLX") eps = 19.00;
+  else if (symbol === "AMD") eps = 3.50;
+  else {
+    // Custom stock: estimate a stable simulated PE around 15-40 based on symbol hash
+    let hash = 0;
+    for (let i = 0; i < symbol.length; i++) {
+      hash = symbol.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const seedEpsFactor = 15 + (Math.abs(hash) % 25);
+    eps = price / seedEpsFactor;
+  }
+  return Number((price / eps).toFixed(2));
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -85,26 +137,41 @@ export async function GET(request: NextRequest) {
           // Determine PE ratio dynamically (not applicable to crypto or indices)
           let pe: number | string = "N/A";
           if (!symbol.endsWith("-USD") && !symbol.startsWith("^")) {
-            let eps = 5.0; // fallback EPS
-            if (symbol === "AAPL") eps = 6.50;
-            else if (symbol === "MSFT") eps = 12.00;
-            else if (symbol === "NVDA") eps = 3.00;
-            else if (symbol === "TSLA") eps = 2.50;
-            else if (symbol === "AMZN") eps = 4.50;
-            else if (symbol === "GOOGL") eps = 7.00;
-            else if (symbol === "META") eps = 18.00;
-            else if (symbol === "NFLX") eps = 19.00;
-            else if (symbol === "AMD") eps = 3.50;
-            else {
-              // Custom stock: estimate a stable simulated PE around 15-40 based on symbol hash
-              let hash = 0;
-              for (let i = 0; i < symbol.length; i++) {
-                hash = symbol.charCodeAt(i) + ((hash << 5) - hash);
+            const cache = readCache();
+            const cachedEntry = cache[symbol];
+            const now = Date.now();
+            const CACHE_LIFETIME = 24 * 60 * 60 * 1000; // 24 hours
+
+            if (cachedEntry && (now - cachedEntry.fetchedAt < CACHE_LIFETIME)) {
+              pe = cachedEntry.pe;
+            } else {
+              // Fetch from Alpha Vantage
+              const apiKey = process.env.ALPHAVANTAGE_API_KEY || "794GUNTZUL79LVB2";
+              try {
+                const avUrl = `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${encodeURIComponent(symbol)}&apikey=${apiKey}`;
+                const avResponse = await fetch(avUrl);
+                if (avResponse.ok) {
+                  const avData = await avResponse.json();
+                  if (avData && avData.PERatio && avData.PERatio !== "None") {
+                    const parsedPe = parseFloat(avData.PERatio);
+                    pe = isNaN(parsedPe) ? avData.PERatio : Number(parsedPe.toFixed(2));
+                    
+                    // Update cache
+                    cache[symbol] = { pe, fetchedAt: now };
+                    writeCache(cache);
+                  } else {
+                    console.warn(`Alpha Vantage did not return a valid PE ratio for ${symbol}. Using fallback.`);
+                    pe = getFallbackPe(symbol, price);
+                  }
+                } else {
+                  console.warn(`Alpha Vantage API error for ${symbol}. Using fallback.`);
+                  pe = getFallbackPe(symbol, price);
+                }
+              } catch (err) {
+                console.error(`Failed to fetch PE from Alpha Vantage for ${symbol}:`, err);
+                pe = getFallbackPe(symbol, price);
               }
-              const seedEpsFactor = 15 + (Math.abs(hash) % 25);
-              eps = price / seedEpsFactor;
             }
-            pe = Number((price / eps).toFixed(2));
           }
 
           return {
