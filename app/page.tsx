@@ -1068,7 +1068,7 @@ export default function Home() {
                             <td className="py-4 px-1 text-center">
                               <button
                                 onClick={() => handleRemoveStock(stock.symbol)}
-                                className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition"
+                                className="p-1.5 text-rose-400/70 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
                                 title={`Stop tracking ${stock.symbol}`}
                               >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -1180,6 +1180,17 @@ export default function Home() {
                       Loading market stats...
                     </div>
                   )}
+
+                  <button
+                    onClick={() => handleRemoveStock(selectedSymbol)}
+                    className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 px-3 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/15 hover:border-rose-500/30 text-rose-400 font-semibold text-xs rounded-xl transition"
+                    title={`Stop tracking ${selectedSymbol}`}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Remove from Watchlist
+                  </button>
                 </>
               ) : (
                 <div className="py-24 text-center text-slate-500 flex flex-col items-center">
