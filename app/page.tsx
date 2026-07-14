@@ -96,6 +96,12 @@ export default function Home() {
   const [chartWidth, setChartWidth] = useState(600);
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
+  // Analysis report state
+  const [activeTab, setActiveTab] = useState<"chart" | "report">("chart");
+  const [analysisReport, setAnalysisReport] = useState<any | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+
   // Flash state to track recent price movements for green/red highlights
   const [priceFlash, setPriceFlash] = useState<Record<string, "up" | "down" | null>>({});
 
@@ -239,6 +245,27 @@ export default function Home() {
     }
   }, []);
 
+  // Fetch Institutional Analyst Report data
+  const fetchAnalysisReport = useCallback(async (symbol: string) => {
+    if (!symbol) return;
+    setAnalysisLoading(true);
+    setAnalysisError(null);
+    try {
+      const response = await fetch(`/api/stock/analysis?symbol=${symbol}`);
+      if (!response.ok) {
+        throw new Error(`Analysis API returned status ${response.status}`);
+      }
+      const data = await response.json();
+      setAnalysisReport(data);
+    } catch (e: any) {
+      console.error("Error fetching analysis report:", e);
+      setAnalysisError(e.message || "Failed to load analyst report.");
+      setAnalysisReport(null);
+    } finally {
+      setAnalysisLoading(false);
+    }
+  }, []);
+
   // 3. Effects for fetching and polling
   const trackedSymbolsString = trackedStocks.map((s) => s.symbol).join(",");
 
@@ -269,6 +296,14 @@ export default function Home() {
     if (!mounted || !selectedSymbol) return;
     fetchChartData(selectedSymbol, chartRange);
   }, [mounted, selectedSymbol, chartRange, fetchChartData]);
+
+  // Refetch analyst report when activeTab becomes 'report' or selected symbol changes
+  useEffect(() => {
+    if (!mounted || !selectedSymbol) return;
+    if (activeTab === "report") {
+      fetchAnalysisReport(selectedSymbol);
+    }
+  }, [mounted, selectedSymbol, activeTab, fetchAnalysisReport]);
 
   // 4. Form handlers
   const handleAddStock = async (e: React.FormEvent) => {
@@ -553,6 +588,420 @@ export default function Home() {
               </>
             )}
           </svg>
+        </div>
+      </div>
+    );
+  };
+
+  // Render comprehensive Analyst Report view
+  const renderAnalystReport = () => {
+    if (analysisLoading) {
+      return (
+        <div className="py-24 flex flex-col items-center justify-center text-slate-400">
+          <svg className="animate-spin h-7 w-7 mb-3 text-indigo-500" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+          <h4 className="text-xs font-bold text-slate-350 tracking-wider">COMPILING EQUITY RESEARCH REPORT</h4>
+          <p className="text-[10px] text-slate-500 mt-1">Analyzing business moats, DCF valuation models, and catalysts...</p>
+        </div>
+      );
+    }
+
+    if (analysisError || !analysisReport) {
+      return (
+        <div className="py-12 text-center text-xs text-slate-505 italic">
+          {analysisError || "No analysis report loaded. Select a stock to begin."}
+        </div>
+      );
+    }
+
+    const r = analysisReport;
+    const prof = r.profile;
+
+    return (
+      <div className="flex flex-col gap-6 text-xs text-slate-300 max-h-[700px] overflow-y-auto pr-1 select-text scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
+        
+        {/* Title / Banner */}
+        <div className="border-b border-slate-800 pb-3 flex flex-col gap-1">
+          <div className="flex justify-between items-center">
+            <h1 className="text-sm font-extrabold text-slate-100 uppercase tracking-wider">{r.name} ({r.symbol}) Analysis</h1>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold tracking-widest ${
+              r.portfolio.recommendation === "BUY" || r.portfolio.recommendation === "ACCUMULATE"
+                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                : r.portfolio.recommendation === "HOLD"
+                ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+            }`}>
+              {r.portfolio.recommendation}
+            </span>
+          </div>
+          <p className="text-[10px] text-slate-500 italic">Compiled dynamically. Analyst Profile: Buffett + Lynch + Graham + Munger</p>
+        </div>
+
+        {/* 1. Company Overview */}
+        <div className="flex flex-col gap-2">
+          <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider border-l-2 border-indigo-500 pl-2">1. Company Overview</h3>
+          <p className="text-slate-400 leading-relaxed">{prof.overview.description}</p>
+          <div className="grid grid-cols-2 gap-2 mt-1 bg-slate-900/40 p-2.5 rounded-xl border border-slate-800/40 font-mono text-[10px]">
+            <div>
+              <span className="text-slate-500 block">Business Model</span>
+              <span className="text-slate-350 leading-normal">{prof.overview.model}</span>
+            </div>
+            <div>
+              <span className="text-slate-500 block">Revenue Segments</span>
+              <span className="text-slate-350 leading-normal">{prof.overview.segments}</span>
+            </div>
+            <div className="mt-1.5">
+              <span className="text-slate-500 block">Geographic Presence</span>
+              <span className="text-slate-350 leading-normal">{prof.overview.geography}</span>
+            </div>
+            <div className="mt-1.5">
+              <span className="text-slate-500 block">Management Quality</span>
+              <span className="text-slate-350 leading-normal">{prof.overview.management}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 2. Business Quality (Ratings out of 10) */}
+        <div className="flex flex-col gap-2">
+          <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider border-l-2 border-indigo-500 pl-2">2. Business Quality</h3>
+          <div className="grid grid-cols-2 gap-3 bg-slate-900/40 p-3 rounded-xl border border-slate-800/40">
+            {Object.entries(prof.moats).map(([key, val]: [string, any]) => (
+              <div key={key} className="flex flex-col gap-1">
+                <div className="flex justify-between text-[10px] capitalize font-mono text-slate-450">
+                  <span>{key === "switching" ? "switching costs" : key === "leader" ? "market leadership" : key}</span>
+                  <span className="font-bold text-indigo-400">{val}/10</span>
+                </div>
+                <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                  <div className="bg-indigo-50 h-full" style={{ width: `${val * 10}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 3. Financial Health (Trends) */}
+        <div className="flex flex-col gap-2">
+          <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider border-l-2 border-indigo-500 pl-2">3. Financial Health</h3>
+          <div className="grid grid-cols-3 gap-2 text-center text-[10px] font-mono">
+            <div className="bg-slate-900/50 p-2 rounded-xl border border-slate-800/50">
+              <span className="text-slate-500 block">Price / Earnings</span>
+              <span className="text-slate-200 font-bold text-xs">{r.pe}</span>
+            </div>
+            <div className="bg-slate-900/50 p-2 rounded-xl border border-slate-800/50">
+              <span className="text-slate-500 block">EPS (Trailing)</span>
+              <span className="text-slate-200 font-bold text-xs">${Number(r.eps).toFixed(2)}</span>
+            </div>
+            <div className="bg-slate-900/50 p-2 rounded-xl border border-slate-800/50">
+              <span className="text-slate-500 block">50-Day Avg Price</span>
+              <span className="text-slate-200 font-bold text-xs">${r.fiftyDayAverage?.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 4. DCF Valuation */}
+        <div className="flex flex-col gap-2 bg-indigo-950/20 border border-indigo-500/35 p-3 rounded-2xl">
+          <div className="flex justify-between items-center">
+            <h4 className="text-xs font-bold text-indigo-300 uppercase tracking-wider">4. DCF Valuation Model</h4>
+            <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+              r.dcf.marginOfSafety > 0 ? "text-emerald-400 bg-emerald-500/10" : "text-rose-400 bg-rose-500/10"
+            }`}>
+              {r.dcf.marginOfSafety > 0 ? "Discounted Value" : "Premium Value"}
+            </span>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-y-1.5 text-[10px] font-mono mt-1">
+            <div className="flex justify-between pr-4 border-r border-slate-800/80">
+              <span className="text-slate-500">Discount Rate</span>
+              <span className="font-bold text-slate-300">{r.dcf.discountRate}%</span>
+            </div>
+            <div className="flex justify-between pl-4">
+              <span className="text-slate-500">Estimated FCF Growth</span>
+              <span className="font-bold text-slate-300">{r.dcf.growthRate}%</span>
+            </div>
+            <div className="flex justify-between pr-4 border-r border-slate-800/80 mt-1">
+              <span className="text-slate-500">Current Market Price</span>
+              <span className="font-bold text-slate-300">${r.price.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between pl-4 mt-1">
+              <span className="text-indigo-300 font-bold">DCF Intrinsic Value</span>
+              <span className="font-extrabold text-indigo-300">${r.dcf.intrinsicValue}</span>
+            </div>
+          </div>
+
+          <div className="text-[10px] border-t border-indigo-500/20 pt-2 text-slate-400">
+            {r.dcf.marginOfSafety > 0 ? (
+              <span>The stock trades at a <strong className="text-emerald-400">{r.dcf.marginOfSafety}% Margin of Safety</strong> relative to its estimated intrinsic value.</span>
+            ) : (
+              <span>The stock trades at a <strong className="text-rose-400">{Math.abs(r.dcf.marginOfSafety)}% Premium</strong> over its estimated intrinsic value.</span>
+            )}
+          </div>
+        </div>
+
+        {/* 5. Competitive Analysis & SWOT */}
+        <div className="flex flex-col gap-2">
+          <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider border-l-2 border-indigo-500 pl-2">5. Competitive Analysis</h3>
+          <p className="text-slate-450"><strong className="text-slate-300">Competitors: </strong>{prof.competition.competitors}</p>
+          <div className="grid grid-cols-2 gap-2 text-[10px]">
+            <div className="bg-slate-900/40 p-2.5 rounded-xl border border-slate-800/40">
+              <span className="font-bold text-slate-300 block mb-1">Competitive Advantages</span>
+              <span className="text-slate-450 leading-normal">{prof.competition.advantages}</span>
+            </div>
+            <div className="bg-slate-900/40 p-2.5 rounded-xl border border-slate-800/40">
+              <span className="font-bold text-slate-300 block mb-1">Key Threats</span>
+              <span className="text-slate-450 leading-normal">{prof.competition.threats}</span>
+            </div>
+          </div>
+
+          {/* SWOT Grid */}
+          <div className="grid grid-cols-2 gap-2 mt-1">
+            <div className="bg-[#10b981]/5 border border-[#10b981]/15 p-2 rounded-xl">
+              <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider font-mono">Strengths</span>
+              <ul className="list-disc list-inside text-[10px] text-slate-450 space-y-0.5 mt-1">
+                {prof.competition.swot.strengths.map((s: string, idx: number) => <li key={idx} className="truncate">{s}</li>)}
+              </ul>
+            </div>
+            <div className="bg-[#ef4444]/5 border border-[#ef4444]/15 p-2 rounded-xl">
+              <span className="text-[9px] font-bold text-rose-400 uppercase tracking-wider font-mono">Weaknesses</span>
+              <ul className="list-disc list-inside text-[10px] text-slate-450 space-y-0.5 mt-1">
+                {prof.competition.swot.weaknesses.map((w: string, idx: number) => <li key={idx} className="truncate">{w}</li>)}
+              </ul>
+            </div>
+            <div className="bg-indigo-500/5 border border-indigo-500/15 p-2 rounded-xl">
+              <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-wider font-mono">Opportunities</span>
+              <ul className="list-disc list-inside text-[10px] text-slate-450 space-y-0.5 mt-1">
+                {prof.competition.swot.opportunities.map((o: string, idx: number) => <li key={idx} className="truncate">{o}</li>)}
+              </ul>
+            </div>
+            <div className="bg-amber-500/5 border border-amber-500/15 p-2 rounded-xl">
+              <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wider font-mono">Threats</span>
+              <ul className="list-disc list-inside text-[10px] text-slate-450 space-y-0.5 mt-1">
+                {prof.competition.swot.threats.map((t: string, idx: number) => <li key={idx} className="truncate">{t}</li>)}
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        {/* 6. Risks */}
+        <div className="flex flex-col gap-2 bg-rose-950/10 border border-rose-500/20 p-3 rounded-2xl text-[10px]">
+          <h3 className="text-xs font-bold text-rose-400 uppercase tracking-wider mb-1">6. Risk Factors</h3>
+          <div className="flex flex-col gap-1.5 font-mono">
+            <div><span className="text-slate-500 font-sans">Business Risks:</span> <span className="text-slate-350">{prof.risks.business}</span></div>
+            <div><span className="text-slate-500 font-sans">Regulatory Risks:</span> <span className="text-slate-350">{prof.risks.regulatory}</span></div>
+            <div><span className="text-slate-500 font-sans">Geopolitical Risks:</span> <span className="text-slate-350">{prof.risks.geopolitical}</span></div>
+            <div><span className="text-slate-500 font-sans">Tech Disruption:</span> <span className="text-slate-350">{prof.risks.disruption}</span></div>
+          </div>
+        </div>
+
+        {/* 7. Growth Drivers */}
+        <div className="flex flex-col gap-2">
+          <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider border-l-2 border-indigo-500 pl-2">7. Growth Drivers</h3>
+          <ul className="list-decimal list-inside space-y-1.5 text-slate-400 leading-normal">
+            {prof.drivers.map((d: string, idx: number) => (
+              <li key={idx}><span className="text-slate-300">{d}</span></li>
+            ))}
+          </ul>
+        </div>
+
+        {/* 8. Quarterly & Earnings Calls */}
+        <div className="flex flex-col gap-2">
+          <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider border-l-2 border-indigo-500 pl-2">8. Recent Quarterly Highlights</h3>
+          <p className="text-slate-450"><strong className="text-slate-300">Guidance: </strong>{prof.quarterly.guidance}</p>
+          <div className="grid grid-cols-2 gap-2 text-[10px]">
+            <div className="bg-emerald-500/5 p-2 rounded-xl border border-emerald-500/10">
+              <span className="font-bold text-emerald-400 block mb-1">Positive Catalysts</span>
+              <ul className="list-disc list-inside space-y-0.5 text-slate-450">
+                {prof.quarterly.positive.map((p: string, idx: number) => <li key={idx}>{p}</li>)}
+              </ul>
+            </div>
+            <div className="bg-rose-500/5 p-2 rounded-xl border border-rose-500/10">
+              <span className="font-bold text-rose-400 block mb-1">Negatives / Concerns</span>
+              <ul className="list-disc list-inside space-y-0.5 text-slate-450">
+                {prof.quarterly.negative.map((n: string, idx: number) => <li key={idx}>{n}</li>)}
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        {/* 9. Earnings Call Summary */}
+        <div className="flex flex-col gap-2 bg-slate-900/40 p-3 rounded-xl border border-slate-800/40 text-[10px]">
+          <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">9. Earnings Call Summary</h4>
+          <div className="flex flex-col gap-1 leading-relaxed mt-1">
+            <div><strong className="text-indigo-400">CEO Comments: </strong>{prof.earningsCall.ceo}</div>
+            <div className="mt-1"><strong className="text-indigo-400">CFO Comments: </strong>{prof.earningsCall.cfo}</div>
+            <div className="mt-1"><strong className="text-indigo-400">Outlook: </strong>{prof.earningsCall.outlook}</div>
+            <div className="mt-1"><strong className="text-indigo-400">Capital Allocation: </strong>{prof.earningsCall.allocation}</div>
+          </div>
+        </div>
+
+        {/* 10. Technical Analysis */}
+        <div className="flex flex-col gap-2">
+          <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider border-l-2 border-indigo-500 pl-2">10. Technical Indicators</h3>
+          <div className="grid grid-cols-2 gap-2.5 font-mono text-[10px] bg-slate-900/40 p-3 rounded-xl border border-slate-800/40">
+            <div className="flex justify-between border-b border-slate-800/40 pb-1">
+              <span className="text-slate-500">Trend Bias</span>
+              <span className="font-bold text-slate-200">{r.technicals.trend}</span>
+            </div>
+            <div className="flex justify-between border-b border-slate-800/40 pb-1">
+              <span className="text-slate-500">Breakout Probability</span>
+              <span className="font-bold text-slate-200">{r.technicals.breakoutProb}</span>
+            </div>
+            <div className="flex justify-between border-b border-slate-800/40 pb-1">
+              <span className="text-slate-500">Support Zone</span>
+              <span className="font-bold text-emerald-400">${r.technicals.support}</span>
+            </div>
+            <div className="flex justify-between border-b border-slate-800/40 pb-1">
+              <span className="text-slate-500">Resistance Zone</span>
+              <span className="font-bold text-rose-400">${r.technicals.resistance}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Relative Strength (RSI)</span>
+              <span className={`font-bold ${r.technicals.rsi >= 70 ? "text-rose-400" : r.technicals.rsi <= 30 ? "text-emerald-400" : "text-indigo-400"}`}>
+                {r.technicals.rsi} ({r.technicals.rsiSignal})
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">MACD Signal</span>
+              <span className="font-bold text-slate-200">{r.technicals.macdSignal}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 11. News Catalyst & Sentiment Analysis */}
+        <div className="flex flex-col gap-2">
+          <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider border-l-2 border-indigo-500 pl-2">11. Catalyst News Sentiment</h3>
+          <div className="flex justify-between items-center text-[10px] font-mono bg-slate-900/40 p-2 rounded-xl border border-slate-800/40">
+            <div>
+              <span className="text-slate-500">Market Sentiment:</span>
+              <span className={`font-extrabold ml-1.5 ${r.sentiment.sentiment === "Bullish" ? "text-emerald-400" : "text-slate-350"}`}>{r.sentiment.sentiment}</span>
+            </div>
+            <div>
+              <span className="text-slate-500">Impact Rating:</span>
+              <span className="font-extrabold text-indigo-400 ml-1.5">{r.sentiment.impact}/10</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            {r.news && r.news.length > 0 ? (
+              r.news.map((item: any, idx: number) => (
+                <a
+                  key={idx}
+                  href={item.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-slate-950/40 hover:bg-[#070b16] border border-slate-850/50 hover:border-slate-800/80 p-2 rounded-xl transition flex gap-2 items-start text-[10px] leading-relaxed text-indigo-400 hover:text-indigo-300"
+                >
+                  <span>📰</span>
+                  <span className="line-clamp-2">{item.title}</span>
+                </a>
+              ))
+            ) : (
+              <span className="text-slate-650 italic">No recent news feeds processed.</span>
+            )}
+          </div>
+        </div>
+
+        {/* 12. Investment Thesis */}
+        <div className="flex flex-col gap-2 text-[10px]">
+          <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider border-l-2 border-indigo-500 pl-2">12. Investment Thesis</h3>
+          <div className="flex flex-col gap-2">
+            <div className="bg-[#10b981]/5 border border-[#10b981]/15 p-2.5 rounded-xl">
+              <span className="font-bold text-emerald-400 block mb-0.5">Bull Case Scenario</span>
+              <span className="text-slate-450 leading-normal">{prof.investmentThesis.bull}</span>
+            </div>
+            <div className="bg-[#ef4444]/5 border border-[#ef4444]/15 p-2.5 rounded-xl">
+              <span className="font-bold text-rose-400 block mb-0.5">Bear Case Scenario</span>
+              <span className="text-slate-450 leading-normal">{prof.investmentThesis.bear}</span>
+            </div>
+            <div className="bg-slate-900/40 border border-slate-800/40 p-2.5 rounded-xl">
+              <span className="font-bold text-slate-200 block mb-0.5">Base Case Scenario</span>
+              <span className="text-slate-450 leading-normal">{prof.investmentThesis.base}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 13. AI Opinion & Conviction Score */}
+        <div className="flex flex-col gap-2">
+          <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider border-l-2 border-indigo-500 pl-2">13. Conviction Rating</h3>
+          <div className="bg-slate-900/55 p-3.5 rounded-2xl border border-slate-800/60 flex items-center justify-between">
+            <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-[10px] font-mono">
+              <div className="flex justify-between gap-4">
+                <span className="text-slate-500">Business Quality</span>
+                <span className="font-bold text-slate-350">{r.aiOpinion.businessQuality}/10</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-slate-500">Valuation Safety</span>
+                <span className="font-bold text-slate-350">{r.aiOpinion.valuation}/10</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-slate-500">Financial Strength</span>
+                <span className="font-bold text-slate-350">{r.aiOpinion.financialStrength}/10</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-slate-500">Risk Profile</span>
+                <span className="font-bold text-slate-350">{r.aiOpinion.risk}/10</span>
+              </div>
+            </div>
+            
+            <div className="flex flex-col items-center justify-center pl-6 border-l border-slate-800/65">
+              <span className="text-[28px] font-black text-indigo-400 leading-none">{r.aiOpinion.conviction}</span>
+              <span className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-widest">CONVICTION /100</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 14. Expected Returns */}
+        <div className="flex flex-col gap-2">
+          <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider border-l-2 border-indigo-500 pl-2">14. Expected Compounding Returns</h3>
+          <div className="grid grid-cols-4 gap-2 text-center font-mono text-[10px] mt-0.5">
+            <div className="bg-slate-900/50 p-2 rounded-xl border border-slate-800/50">
+              <span className="text-slate-500 block">1 Year</span>
+              <span className="font-extrabold text-indigo-400 text-xs mt-0.5 block">{r.expectedReturns.year1}</span>
+            </div>
+            <div className="bg-slate-900/50 p-2 rounded-xl border border-slate-800/50">
+              <span className="text-slate-500 block">3 Years</span>
+              <span className="font-extrabold text-indigo-400 text-xs mt-0.5 block">{r.expectedReturns.year3}</span>
+            </div>
+            <div className="bg-slate-900/50 p-2 rounded-xl border border-slate-800/50">
+              <span className="text-slate-500 block">5 Years</span>
+              <span className="font-extrabold text-indigo-400 text-xs mt-0.5 block">{r.expectedReturns.year5}</span>
+            </div>
+            <div className="bg-slate-900/50 p-2 rounded-xl border border-slate-800/50">
+              <span className="text-slate-500 block">10 Years</span>
+              <span className="font-extrabold text-indigo-400 text-xs mt-0.5 block">{r.expectedReturns.year10}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 15. Recommendation Statement */}
+        <div className="flex flex-col gap-2 bg-indigo-950/20 border border-indigo-500/35 p-3.5 rounded-2xl">
+          <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest">Portfolio Recommendation Strategy</span>
+          <div className="flex items-center gap-3 mt-1.5">
+            <span className={`text-[13px] font-black px-2.5 py-1 rounded-xl tracking-wider ${
+              r.portfolio.recommendation === "BUY" || r.portfolio.recommendation === "ACCUMULATE"
+                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 animate-pulse"
+                : r.portfolio.recommendation === "HOLD"
+                ? "bg-amber-500/10 text-amber-400 border border-amber-500/25"
+                : "bg-rose-500/10 text-rose-400 border border-rose-500/25"
+            }`}>
+              {r.portfolio.recommendation}
+            </span>
+            <p className="text-slate-400 leading-normal text-[11px]">{r.portfolio.explanation}</p>
+          </div>
+        </div>
+
+        {/* Footer: Top 5 Things every investor should know */}
+        <div className="border-t border-slate-800/60 pt-4 mt-2 flex flex-col gap-2 bg-slate-950/20 p-3 rounded-2xl border border-slate-800/30">
+          <span className="text-[10px] font-extrabold text-slate-450 uppercase tracking-widest pl-1">Top 5 things every investor should know:</span>
+          <ul className="list-inside space-y-1.5 text-slate-450 leading-relaxed text-[10.5px]">
+            {prof.thingsToKnow.map((t: string, idx: number) => (
+              <li key={idx} className="flex gap-2 items-start">
+                <span className="text-indigo-400 font-bold font-mono">{idx + 1}.</span>
+                <span>{t}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     );
@@ -1095,90 +1544,120 @@ export default function Home() {
               {/* Card Header & Selected symbol selector */}
               {selectedSymbol ? (
                 <>
-                  <div className="flex justify-between items-start">
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl font-extrabold text-slate-100">{selectedSymbol}</span>
-                        <span className="text-xs uppercase text-slate-500 font-mono tracking-wider font-semibold">
-                          {quotes[selectedSymbol]?.name ? "Active Quote" : "Selected"}
-                        </span>
-                      </div>
-                      <span className="text-xs text-slate-400 truncate max-w-[180px] mt-0.5">
-                        {quotes[selectedSymbol]?.name || "Loading metadata..."}
-                      </span>
-                    </div>
-
-                    {/* Chart range selection badges */}
-                    <div className="flex bg-[#070b16] rounded-lg p-0.5 border border-slate-800">
-                      {(["1D", "1W", "1M", "1Y"] as const).map((r) => (
-                        <button
-                          key={r}
-                          onClick={() => setChartRange(r)}
-                          className={`px-2 py-1 text-[10px] font-bold rounded-md transition ${
-                            chartRange === r
-                              ? "bg-indigo-600 text-white shadow-md"
-                              : "text-slate-400 hover:text-slate-200"
-                          }`}
-                        >
-                          {r}
-                        </button>
-                      ))}
-                    </div>
+                  {/* Tabs Selector Bar */}
+                  <div className="flex border-b border-slate-800/60 pb-2 mb-3 gap-4">
+                    <button
+                      onClick={() => setActiveTab("chart")}
+                      className={`pb-1.5 px-1 text-[11px] font-extrabold transition-all border-b-2 tracking-wider uppercase ${
+                        activeTab === "chart"
+                          ? "border-indigo-500 text-indigo-400"
+                          : "border-transparent text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      Chart & Stats
+                    </button>
+                    <button
+                      onClick={() => setActiveTab("report")}
+                      className={`pb-1.5 px-1 text-[11px] font-extrabold transition-all border-b-2 tracking-wider uppercase ${
+                        activeTab === "report"
+                          ? "border-indigo-500 text-indigo-400"
+                          : "border-transparent text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      🔍 Institutional Report
+                    </button>
                   </div>
 
-                  {/* Rendering SVG Chart */}
-                  <div className="border-t border-b border-slate-800/60 py-4">
-                    {renderChart()}
-                  </div>
+                  {activeTab === "chart" ? (
+                    <>
+                      <div className="flex justify-between items-start">
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl font-extrabold text-slate-100">{selectedSymbol}</span>
+                            <span className="text-xs uppercase text-slate-500 font-mono tracking-wider font-semibold">
+                              {quotes[selectedSymbol]?.name ? "Active Quote" : "Selected"}
+                            </span>
+                          </div>
+                          <span className="text-xs text-slate-400 truncate max-w-[180px] mt-0.5">
+                            {quotes[selectedSymbol]?.name || "Loading metadata..."}
+                          </span>
+                        </div>
 
-                  {/* Detailed Stock Statistics List */}
-                  {quotes[selectedSymbol] ? (
-                    <div className="flex flex-col gap-3">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Market Statistics</h3>
-                      
-                      <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs font-mono">
-                        <div className="flex justify-between border-b border-slate-800/30 pb-1">
-                          <span className="text-slate-500">Market Cap</span>
-                          <span className="font-bold text-slate-300">
-                            {formatNumber(quotes[selectedSymbol].marketCap)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between border-b border-slate-800/30 pb-1">
-                          <span className="text-slate-500">Day Volume</span>
-                          <span className="font-bold text-slate-300">
-                            {formatNumber(quotes[selectedSymbol].volume)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between border-b border-slate-800/30 pb-1">
-                          <span className="text-slate-500">Open Price</span>
-                          <span className="font-bold text-slate-300">
-                            {formatCurrency(quotes[selectedSymbol].open)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between border-b border-slate-800/30 pb-1">
-                          <span className="text-slate-500">Prev Close</span>
-                          <span className="font-bold text-slate-300">
-                            {formatCurrency(quotes[selectedSymbol].previousClose)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between border-b border-slate-800/30 pb-1">
-                          <span className="text-slate-500">PE Ratio</span>
-                          <span className="font-bold text-slate-300">
-                            {quotes[selectedSymbol].pe ?? "N/A"}
-                          </span>
-                        </div>
-                        <div className="flex justify-between border-b border-slate-800/30 pb-1">
-                          <span className="text-slate-500">Day Range</span>
-                          <span className="font-bold text-slate-300">
-                            {formatCurrency(quotes[selectedSymbol].low)} - {formatCurrency(quotes[selectedSymbol].high)}
-                          </span>
+                        {/* Chart range selection badges */}
+                        <div className="flex bg-[#070b16] rounded-lg p-0.5 border border-slate-800">
+                          {(["1D", "1W", "1M", "1Y"] as const).map((r) => (
+                            <button
+                              key={r}
+                              onClick={() => setChartRange(r)}
+                              className={`px-2 py-1 text-[10px] font-bold rounded-md transition ${
+                                chartRange === r
+                                  ? "bg-indigo-600 text-white shadow-md"
+                                  : "text-slate-400 hover:text-slate-200"
+                              }`}
+                            >
+                              {r}
+                            </button>
+                          ))}
                         </div>
                       </div>
-                    </div>
+
+                      {/* Rendering SVG Chart */}
+                      <div className="border-t border-b border-slate-800/60 py-4">
+                        {renderChart()}
+                      </div>
+
+                      {/* Detailed Stock Statistics List */}
+                      {quotes[selectedSymbol] ? (
+                        <div className="flex flex-col gap-3">
+                          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Market Statistics</h3>
+                          
+                          <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs font-mono">
+                            <div className="flex justify-between border-b border-slate-800/30 pb-1">
+                              <span className="text-slate-500">Market Cap</span>
+                              <span className="font-bold text-slate-300">
+                                {formatNumber(quotes[selectedSymbol].marketCap)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between border-b border-slate-800/30 pb-1">
+                              <span className="text-slate-500">Day Volume</span>
+                              <span className="font-bold text-slate-300">
+                                {formatNumber(quotes[selectedSymbol].volume)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between border-b border-slate-800/30 pb-1">
+                              <span className="text-slate-500">Open Price</span>
+                              <span className="font-bold text-slate-300">
+                                {formatCurrency(quotes[selectedSymbol].open)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between border-b border-slate-800/30 pb-1">
+                              <span className="text-slate-500">Prev Close</span>
+                              <span className="font-bold text-slate-300">
+                                {formatCurrency(quotes[selectedSymbol].previousClose)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between border-b border-slate-800/30 pb-1">
+                              <span className="text-slate-500">PE Ratio</span>
+                              <span className="font-bold text-slate-300">
+                                {quotes[selectedSymbol].pe ?? "N/A"}
+                              </span>
+                            </div>
+                            <div className="flex justify-between border-b border-slate-800/30 pb-1">
+                              <span className="text-slate-500">Day Range</span>
+                              <span className="font-bold text-slate-300">
+                                {formatCurrency(quotes[selectedSymbol].low)} - {formatCurrency(quotes[selectedSymbol].high)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-xs text-slate-500 italic text-center py-4">
+                          Loading market stats...
+                        </div>
+                      )}
+                    </>
                   ) : (
-                    <div className="text-xs text-slate-500 italic text-center py-4">
-                      Loading market stats...
-                    </div>
+                    renderAnalystReport()
                   )}
                 </>
               ) : (
