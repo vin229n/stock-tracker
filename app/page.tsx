@@ -102,32 +102,75 @@ export default function Home() {
   // Sorting state for % distance column
   const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(null);
 
-  // 1. Initial mounting check and loading from localStorage
+  // Google Sheets Cloud Sync State
+  const [syncConfigured, setSyncConfigured] = useState<boolean | null>(null);
+  const [syncSource, setSyncSource] = useState<string>("");
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  // 1. Initial mounting check and loading from Google Sheets API / Server Database
   useEffect(() => {
     setMounted(true);
-    const local = localStorage.getItem("tracked_stocks");
-    if (local) {
+    
+    const loadStocks = async () => {
+      setLoading(true);
+      setSyncError(null);
       try {
-        const parsed = JSON.parse(local);
-        setTrackedStocks(parsed);
-        if (parsed.length > 0) {
-          setSelectedSymbol(parsed[0].symbol);
+        const res = await fetch("/api/stocks");
+        if (res.ok) {
+          const data = await res.json();
+          setSyncConfigured(data.configured);
+          setSyncSource(data.source);
+          if (data.error) {
+            setSyncError(data.error);
+          }
+          if (data.stocks && Array.isArray(data.stocks)) {
+            setTrackedStocks(data.stocks);
+            if (data.stocks.length > 0) {
+              setSelectedSymbol(data.stocks[0].symbol);
+            }
+            return;
+          }
         }
-      } catch (e) {
+        // Fallback to default
         setTrackedStocks(DEFAULT_TRACKED);
         setSelectedSymbol(DEFAULT_TRACKED[0].symbol);
+      } catch (error: any) {
+        console.error("Error loading stocks:", error);
+        setSyncError(error.message || "Failed to load stocks from database");
+        setTrackedStocks(DEFAULT_TRACKED);
+        setSelectedSymbol(DEFAULT_TRACKED[0].symbol);
+      } finally {
+        setLoading(false);
       }
-    } else {
-      setTrackedStocks(DEFAULT_TRACKED);
-      localStorage.setItem("tracked_stocks", JSON.stringify(DEFAULT_TRACKED));
-      setSelectedSymbol(DEFAULT_TRACKED[0].symbol);
-    }
+    };
+    
+    loadStocks();
   }, []);
 
-  // Sync trackedStocks state to localStorage
-  const saveTrackedStocks = (stocks: TrackedStock[]) => {
+  // Sync trackedStocks state to Google Sheets API / Server Database
+  const saveTrackedStocks = async (stocks: TrackedStock[]) => {
+    // Update local state immediately for UI responsiveness (Optimistic UI)
     setTrackedStocks(stocks);
-    localStorage.setItem("tracked_stocks", JSON.stringify(stocks));
+    setSyncError(null);
+    
+    try {
+      const res = await fetch("/api/stocks", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ stocks }),
+      });
+      const data = await res.json();
+      setSyncConfigured(data.configured);
+      setSyncSource(data.source);
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to save stocks list to sheet");
+      }
+    } catch (err: any) {
+      console.error("Error saving tracked stocks:", err);
+      setSyncError(err.message || "Failed to save changes to cloud database");
+    }
   };
 
   // Helper to adjust detailed chart sizing reactively
@@ -215,6 +258,46 @@ export default function Home() {
       console.error("Error fetching ticker tape:", e);
     }
   }, []);
+
+  // Synchronize latest stock list from Google Sheet and update quotes
+  const handleRefreshAll = async () => {
+    setRefreshing(true);
+    setSyncError(null);
+    try {
+      const res = await fetch("/api/stocks");
+      if (res.ok) {
+        const data = await res.json();
+        setSyncConfigured(data.configured);
+        setSyncSource(data.source);
+        if (data.error) {
+          setSyncError(data.error);
+        }
+        if (data.stocks && Array.isArray(data.stocks)) {
+          setTrackedStocks(data.stocks);
+          // Check if previously selected symbol still exists
+          if (data.stocks.length > 0) {
+            const hasSelected = data.stocks.some((s: TrackedStock) => s.symbol === selectedSymbol);
+            if (!hasSelected) {
+              setSelectedSymbol(data.stocks[0].symbol);
+            }
+          } else {
+            setSelectedSymbol("");
+          }
+          const symbols = data.stocks.map((s: TrackedStock) => s.symbol);
+          await fetchQuotes(symbols, false);
+          return;
+        }
+      }
+      // Fallback: just fetch quotes for local state if API request failed
+      await fetchQuotes(trackedStocks.map((s) => s.symbol), false);
+    } catch (e: any) {
+      console.error("Failed to refresh stock sheet and quotes:", e);
+      setSyncError(e.message || "Refresh error");
+      await fetchQuotes(trackedStocks.map((s) => s.symbol), false);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // Fetch historical chart data for the selected stock
   const fetchChartData = useCallback(async (symbol: string, range: string) => {
@@ -699,8 +782,34 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-3">
+            {syncConfigured !== null && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900/60 text-[11px] font-medium leading-none">
+                {syncConfigured ? (
+                  <>
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                    </span>
+                    <span className="text-emerald-400/90 font-mono">Google Sheets Synced</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
+                    </span>
+                    <span className="text-amber-400/90 font-mono">Local Fallback DB</span>
+                  </>
+                )}
+                {syncError && (
+                  <span className="text-red-400 ml-1.5 font-mono text-[10px] border-l border-slate-850 pl-1.5" title={syncError}>
+                    Sync Err!
+                  </span>
+                )}
+              </div>
+            )}
+
             <button
-              onClick={() => fetchQuotes(trackedStocks.map((s) => s.symbol))}
+              onClick={handleRefreshAll}
               disabled={refreshing || loading}
               className="flex items-center gap-2 px-3.5 py-2 bg-slate-800/80 hover:bg-slate-700/80 disabled:opacity-50 text-xs font-semibold text-slate-200 rounded-lg border border-slate-700/50 shadow-sm transition"
             >
