@@ -139,6 +139,11 @@ export default function Home() {
   const [syncSource, setSyncSource] = useState<string>("");
   const [syncError, setSyncError] = useState<string | null>(null);
 
+  // Target Price Editing Modal State
+  const [editingStock, setEditingStock] = useState<TrackedStock | null>(null);
+  const [editTargetPrice, setEditTargetPrice] = useState<string>("");
+  const [editModalError, setEditModalError] = useState<string | null>(null);
+
   // 1. Initial mounting check and loading from Google Sheets API / Server Database
   useEffect(() => {
     setMounted(true);
@@ -469,19 +474,25 @@ export default function Home() {
     saveTrackedStocks(updated);
   };
 
-  const handleEditTargetPrice = (symbol: string, currentVal: string) => {
-    const newVal = window.prompt(`Enter target entry price for ${symbol}:`, currentVal);
-    if (newVal !== null) {
-      const trimmed = newVal.trim();
-      if (trimmed === "") {
-        handleUpdateStockInput(symbol, "entryPrice", "");
+  const handleOpenEditTargetPrice = (stock: TrackedStock) => {
+    setEditingStock(stock);
+    setEditTargetPrice(stock.entryPrice);
+    setEditModalError(null);
+  };
+
+  const handleSaveTargetPrice = () => {
+    if (!editingStock) return;
+    const trimmed = editTargetPrice.trim();
+    if (trimmed === "") {
+      handleUpdateStockInput(editingStock.symbol, "entryPrice", "");
+      setEditingStock(null);
+    } else {
+      const parsed = parseFloat(trimmed);
+      if (!isNaN(parsed) && parsed >= 0) {
+        handleUpdateStockInput(editingStock.symbol, "entryPrice", parsed.toFixed(2));
+        setEditingStock(null);
       } else {
-        const parsed = parseFloat(trimmed);
-        if (!isNaN(parsed) && parsed >= 0) {
-          handleUpdateStockInput(symbol, "entryPrice", parsed.toFixed(2));
-        } else {
-          alert("Please enter a valid positive number.");
-        }
+        setEditModalError("Please enter a valid positive number.");
       }
     }
   };
@@ -1322,15 +1333,15 @@ export default function Home() {
 
                               {/* Target Entry */}
                               <td className="py-4 px-3">
-                                <div 
+                                <div
                                   className="flex items-center gap-1.5 cursor-pointer group/edit hover:text-indigo-400 transition-colors w-fit font-mono font-semibold text-slate-350"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleEditTargetPrice(stock.symbol, stock.entryPrice);
+                                    handleOpenEditTargetPrice(stock);
                                   }}
                                 >
                                   <span>{entry > 0 ? formatCurrency(entry, stock.symbol) : "---"}</span>
-                                  <button 
+                                  <button
                                     className="text-slate-500 group-hover/edit:text-indigo-400 p-0.5 rounded transition-colors"
                                     title="Edit target entry price"
                                   >
@@ -1509,9 +1520,9 @@ export default function Home() {
                           {/* Target Entry Row */}
                           <div className="flex items-center justify-between gap-3 text-xs" onClick={(e) => e.stopPropagation()}>
                             <span className="text-slate-400 font-medium whitespace-nowrap">Target Entry:</span>
-                            <div 
+                            <div
                               className="flex items-center gap-1.5 cursor-pointer group/edit hover:text-indigo-400 transition-colors font-mono font-semibold text-slate-350"
-                              onClick={() => handleEditTargetPrice(stock.symbol, stock.entryPrice)}
+                              onClick={() => handleOpenEditTargetPrice(stock)}
                             >
                               <span>{entry > 0 ? formatCurrency(entry, stock.symbol) : "---"}</span>
                               <button className="text-slate-500 group-hover/edit:text-indigo-400 p-0.5 rounded transition-colors" title="Edit target entry price">
@@ -1546,6 +1557,109 @@ export default function Home() {
           </section>
         </div>
       </div>
+
+      {/* Edit Target Price Modal */}
+      {editingStock && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm transition-all duration-300 animate-fade-in">
+          {/* Backdrop Click to Close */}
+          <div className="absolute inset-0 cursor-default" onClick={() => setEditingStock(null)} />
+
+          {/* Modal Card */}
+          <div className="relative w-full max-w-md bg-[#0b1021]/95 border border-slate-800 rounded-3xl shadow-2xl p-6 flex flex-col gap-5 z-10 backdrop-blur-md transform transition-transform duration-300 scale-100 animate-slide-up">
+            {/* Close Button Icon */}
+            <button
+              onClick={() => setEditingStock(null)}
+              className="absolute right-5 top-5 text-slate-400 hover:text-slate-200 transition-colors p-1.5 hover:bg-slate-800/60 rounded-xl cursor-pointer"
+              title="Close modal"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            {/* Modal Header */}
+            <div>
+              <h3 className="text-lg font-bold text-slate-200 flex items-center gap-2">
+                <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                </svg>
+                Edit Target Price
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Configure target entry price for <span className="font-bold text-slate-200">{editingStock.symbol}</span>
+              </p>
+            </div>
+
+            {/* Current Price & Symbol Info */}
+            <div className="bg-[#070b16]/50 border border-slate-800/60 rounded-xl p-3.5 flex justify-between items-center text-xs">
+              <div className="flex flex-col">
+                <span className="text-slate-500 font-medium">Company</span>
+                <span className="font-bold text-slate-300 truncate max-w-[200px]">
+                  {quotes[editingStock.symbol]?.name || "Loading..."}
+                </span>
+              </div>
+              <div className="flex flex-col items-end">
+                <span className="text-slate-500 font-medium">Current Price</span>
+                <span className="font-bold text-indigo-400 font-mono">
+                  {quotes[editingStock.symbol] ? formatCurrency(quotes[editingStock.symbol].price, editingStock.symbol) : "Loading..."}
+                </span>
+              </div>
+            </div>
+
+            {/* Input Form */}
+            <div className="flex flex-col gap-2">
+              <label htmlFor="targetPriceInput" className="text-xs font-semibold text-slate-400">
+                Target Price ({editingStock.symbol.endsWith(".NS") || editingStock.symbol.endsWith(".BO") ? "₹" : "$"})
+              </label>
+              <div className="relative">
+                <input
+                  id="targetPriceInput"
+                  type="text"
+                  value={editTargetPrice}
+                  onChange={(e) => {
+                    setEditTargetPrice(e.target.value);
+                    setEditModalError(null);
+                  }}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleSaveTargetPrice();
+                    } else if (e.key === "Escape") {
+                      setEditingStock(null);
+                    }
+                  }}
+                  placeholder="Enter positive number or leave blank"
+                  className="w-full bg-[#070b16] border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm py-2.5 px-4 rounded-xl text-slate-200 placeholder-slate-600 outline-none transition font-mono"
+                />
+              </div>
+              {editModalError && (
+                <span className="text-rose-400 text-xs mt-1 flex gap-1 items-center">
+                  <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                  </svg>
+                  <span>{editModalError}</span>
+                </span>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 border-t border-slate-800/60 pt-4 mt-1">
+              <button
+                onClick={() => setEditingStock(null)}
+                className="flex-1 py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveTargetPrice}
+                className="flex-1 py-2.5 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs rounded-xl shadow-md transition cursor-pointer"
+              >
+                Save Price
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Detailed Stock Statistics & Graph Modal */}
       {selectedSymbol && (
