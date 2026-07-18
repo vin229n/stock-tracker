@@ -168,7 +168,7 @@ export async function GET(request: NextRequest) {
               pe = cachedEntry.pe;
             } else {
               // Fetch from Alpha Vantage
-              const apiKey = process.env.ALPHAVANTAGE_API_KEY || "794GUNTZUL79LVB2";
+              const apiKey = process.env.ALPHAVANTAGE_API_KEY || "3BPW854QDQNIQTN3";
               try {
                 const avUrl = `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${encodeURIComponent(symbol)}&apikey=${apiKey}`;
                 const avResponse = await fetch(avUrl);
@@ -177,7 +177,7 @@ export async function GET(request: NextRequest) {
                   if (avData && avData.PERatio && avData.PERatio !== "None") {
                     const parsedPe = parseFloat(avData.PERatio);
                     pe = isNaN(parsedPe) ? avData.PERatio : Number(parsedPe.toFixed(2));
-                    
+
                     // Update cache
                     cache[symbol] = { pe, fetchedAt: now };
                     writeCache(cache);
@@ -205,27 +205,46 @@ export async function GET(request: NextRequest) {
             } else if (symbol.endsWith("-USD")) {
               sector = "Cryptocurrency";
             } else {
+              // Fetch from Alpha Vantage
+              const apiKey = process.env.ALPHAVANTAGE_API_KEY || "794GUNTZUL79LVB2";
               try {
-                const summaryUrl = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=assetProfile`;
-                const summaryRes = await fetch(summaryUrl, {
-                  method: "GET",
-                  headers: {
-                    "User-Agent":
-                      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-                    Accept: "application/json",
-                  },
-                  next: { revalidate: 0 },
-                });
-                if (summaryRes.ok) {
-                  const summaryData = await summaryRes.json();
-                  const profile = summaryData.quoteSummary?.result?.[0]?.assetProfile;
-                  if (profile?.sector) {
-                    sector = profile.sector;
+                const avUrl = `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${encodeURIComponent(symbol)}&apikey=${apiKey}`;
+                const avResponse = await fetch(avUrl);
+                if (avResponse.ok) {
+                  const avData = await avResponse.json();
+                  if (avData && avData.Sector && avData.Sector !== "None") {
+                    sector = avData.Sector;
                   }
                 }
-              } catch (e) {
-                console.error(`Failed to fetch sector for ${symbol}:`, e);
+              } catch (err) {
+                console.error(`Failed to fetch sector from Alpha Vantage for ${symbol}:`, err);
               }
+
+              // Fallback to Yahoo Finance if Alpha Vantage didn't return a sector
+              if (!sector) {
+                try {
+                  const summaryUrl = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=assetProfile`;
+                  const summaryRes = await fetch(summaryUrl, {
+                    method: "GET",
+                    headers: {
+                      "User-Agent":
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                      Accept: "application/json",
+                    },
+                    next: { revalidate: 0 },
+                  });
+                  if (summaryRes.ok) {
+                    const summaryData = await summaryRes.json();
+                    const profile = summaryData.quoteSummary?.result?.[0]?.assetProfile;
+                    if (profile?.sector) {
+                      sector = profile.sector;
+                    }
+                  }
+                } catch (e) {
+                  console.error(`Failed to fetch fallback sector for ${symbol}:`, e);
+                }
+              }
+
               if (!sector) {
                 sector = "Other";
               }

@@ -1537,20 +1537,7 @@ export default function Home() {
                     })}
                   </div>
 
-                  {/* Quick Helper Card */}
-                  <div className="p-5 bg-slate-900/25 border border-slate-800/80 rounded-2xl backdrop-blur-md shadow-lg flex gap-3 text-xs text-slate-400 mt-6">
-                    <svg className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
-                    </svg>
-                    <div>
-                      <h4 className="font-bold text-slate-300 mb-1">Quick Instructions</h4>
-                      <ul className="list-disc list-inside space-y-1.5 text-slate-400 leading-relaxed">
-                        <li>Prices update in real-time every 10s.</li>
-                        <li>Click on any asset row to view its detailed chart and market statistics in a popup modal.</li>
-                        <li>Input your custom <strong className="text-slate-200">Target Entry</strong> price directly in the input field; it persists automatically.</li>
-                      </ul>
-                    </div>
-                  </div>
+
                 </>
               )}
             </div>
