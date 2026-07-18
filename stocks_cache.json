@@ -3,5 +3,35 @@
     "symbol": "INTC",
     "entryPrice": "101.25",
     "quantity": "1"
+  },
+  {
+    "symbol": "AAPL",
+    "entryPrice": "325.59",
+    "quantity": "1"
+  },
+  {
+    "symbol": "NVDA",
+    "entryPrice": "208.59",
+    "quantity": "1"
+  },
+  {
+    "symbol": "MSFT",
+    "entryPrice": "397.31",
+    "quantity": "1"
+  },
+  {
+    "symbol": "MU",
+    "entryPrice": "876.28",
+    "quantity": "1"
+  },
+  {
+    "symbol": "TSLA",
+    "entryPrice": "391.3",
+    "quantity": "1"
+  },
+  {
+    "symbol": "SBICARD.NS",
+    "entryPrice": "654.7",
+    "quantity": "1"
   }
 ]

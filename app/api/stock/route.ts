@@ -187,6 +187,7 @@ export async function GET(request: NextRequest) {
             volume,
             marketCap,
             pe,
+            currency: meta?.currency || (symbol.endsWith(".NS") || symbol.endsWith(".BO") ? "INR" : "USD"),
           };
         } catch (err) {
           console.error(`Exception occurred while fetching ${symbol} quote:`, err);

@@ -23,6 +23,7 @@ interface StockQuote {
   volume: number;
   marketCap: number;
   pe?: number | string;
+  currency?: string;
 }
 
 // Structure of chart data points
@@ -54,8 +55,22 @@ const SUGGESTED_TICKERS = [
   { symbol: "ETH-USD", name: "Ethereum USD" },
 ];
 
+const INDIAN_SUGGESTED_TICKERS = [
+  { symbol: "RELIANCE.NS", name: "Reliance Industries Limited (NSE)" },
+  { symbol: "TCS.BO", name: "Tata Consultancy Services (BSE)" },
+  { symbol: "INFY.NS", name: "Infosys Limited (NSE)" },
+  { symbol: "HDFCBANK.NS", name: "HDFC Bank Limited (NSE)" },
+  { symbol: "ICICIBANK.NS", name: "ICICI Bank Limited (NSE)" },
+  { symbol: "TATASTEEL.NS", name: "Tata Steel Limited (NSE)" },
+  { symbol: "SBIN.BO", name: "State Bank of India (BSE)" },
+  { symbol: "BHARTIARTL.NS", name: "Bharti Airtel Limited (NSE)" },
+  { symbol: "ITC.NS", name: "ITC Limited (NSE)" },
+  { symbol: "LTIM.BO", name: "LTIMindtree Limited (BSE)" },
+];
+
 // Scrolling ticker symbols displayed in the marquee
-const TICKER_TAPE_SYMBOLS = ["^GSPC", "^IXIC", "^DJI", "BTC-USD", "ETH-USD", "AAPL", "MSFT", "TSLA", "NVDA"];
+const US_TICKER_TAPE_SYMBOLS = ["^GSPC", "^IXIC", "^DJI", "BTC-USD", "ETH-USD", "AAPL", "MSFT", "TSLA", "NVDA"];
+const IN_TICKER_TAPE_SYMBOLS = ["^BSESN", "^NSEI", "RELIANCE.NS", "TCS.BO", "INFY.NS", "HDFCBANK.NS", "ICICIBANK.NS", "SBIN.BO"];
 
 // Default stocks to pre-populate for a new user
 const DEFAULT_TRACKED: TrackedStock[] = [
@@ -79,6 +94,9 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  // Active Tab state (US Stocks vs Indian Stocks)
+  const [activeTab, setActiveTab] = useState<"US" | "IN">("US");
 
   // Search input state
   const [searchQuery, setSearchQuery] = useState("");
@@ -243,9 +261,10 @@ export default function Home() {
   }, []);
 
   // Fetch Scrolling Ticker Tape data
-  const fetchTapeQuotes = useCallback(async () => {
+  const fetchTapeQuotes = useCallback(async (symbolsToFetch: string[]) => {
+    if (!symbolsToFetch || symbolsToFetch.length === 0) return;
     try {
-      const symbols = TICKER_TAPE_SYMBOLS.join(",");
+      const symbols = symbolsToFetch.join(",");
       const response = await fetch(`/api/stock?symbols=${symbols}`);
       if (!response.ok) throw new Error("Failed to fetch tape quotes");
       const data = await response.json();
@@ -325,27 +344,38 @@ export default function Home() {
   // 3. Effects for fetching and polling
   const trackedSymbolsString = trackedStocks.map((s) => s.symbol).join(",");
 
+  const activeTapeSymbols = React.useMemo(() => {
+    return activeTab === "IN" ? IN_TICKER_TAPE_SYMBOLS : US_TICKER_TAPE_SYMBOLS;
+  }, [activeTab]);
+
   useEffect(() => {
     if (!mounted) return;
     const symbolsList = trackedSymbolsString ? trackedSymbolsString.split(",") : [];
     fetchQuotes(symbolsList);
-    fetchTapeQuotes();
 
     // Setup polling every 10 seconds for quotes
     const quotesInterval = setInterval(() => {
       fetchQuotes(symbolsList, true);
     }, 10000);
 
+    return () => {
+      clearInterval(quotesInterval);
+    };
+  }, [mounted, trackedSymbolsString, fetchQuotes]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    fetchTapeQuotes(activeTapeSymbols);
+
     // Setup polling every 30 seconds for ticker tape
     const tapeInterval = setInterval(() => {
-      fetchTapeQuotes();
+      fetchTapeQuotes(activeTapeSymbols);
     }, 30000);
 
     return () => {
-      clearInterval(quotesInterval);
       clearInterval(tapeInterval);
     };
-  }, [mounted, trackedSymbolsString, fetchQuotes, fetchTapeQuotes]);
+  }, [mounted, activeTapeSymbols, fetchTapeQuotes]);
 
   // Refetch chart when selected symbol or range changes
   useEffect(() => {
@@ -356,8 +386,13 @@ export default function Home() {
   // 4. Form handlers
   const handleAddStock = async (e: React.FormEvent) => {
     e.preventDefault();
-    const symbol = searchQuery.trim().toUpperCase();
+    let symbol = searchQuery.trim().toUpperCase();
     if (!symbol) return;
+
+    // Smart suffix completion: Auto-append .NS for Indian tab if no dot/suffix exists
+    if (activeTab === "IN" && !symbol.includes(".")) {
+      symbol = `${symbol}.NS`;
+    }
 
     if (trackedStocks.some((s) => s.symbol === symbol)) {
       setAddError(`${symbol} is already added.`);
@@ -388,6 +423,11 @@ export default function Home() {
       saveTrackedStocks(updated);
       setQuotes((prev) => ({ ...prev, [quote.symbol]: quote }));
       setSelectedSymbol(quote.symbol);
+
+      // Auto-tab selection: switch tab if the added stock belongs to the other tab
+      const isIndian = quote.symbol.endsWith(".NS") || quote.symbol.endsWith(".BO");
+      setActiveTab(isIndian ? "IN" : "US");
+
       setSearchQuery("");
       setShowSuggestions(false);
     } catch (err) {
@@ -416,6 +456,48 @@ export default function Home() {
     saveTrackedStocks(updated);
   };
 
+  const handleTabChange = (tab: "US" | "IN") => {
+    setActiveTab(tab);
+    const filtered = trackedStocks.filter((s) => {
+      const isIndian = s.symbol.endsWith(".NS") || s.symbol.endsWith(".BO");
+      return tab === "IN" ? isIndian : !isIndian;
+    });
+    if (filtered.length > 0) {
+      setSelectedSymbol(filtered[0].symbol);
+    } else {
+      setSelectedSymbol("");
+    }
+  };
+
+  const handleAddDefaultIndianStocks = async () => {
+    setLoading(true);
+    const presets = [
+      { symbol: "RELIANCE.NS", entryPrice: "2400.00", quantity: "10" },
+      { symbol: "TCS.BO", entryPrice: "3800.00", quantity: "5" },
+      { symbol: "HDFCBANK.NS", entryPrice: "1500.00", quantity: "15" },
+    ];
+    
+    try {
+      const symbols = presets.map((p) => p.symbol).join(",");
+      const res = await fetch(`/api/stock?symbols=${symbols}`);
+      if (res.ok) {
+        const data = await res.json();
+        const newQuotes: Record<string, StockQuote> = {};
+        data.quotes.forEach((q: StockQuote) => {
+          newQuotes[q.symbol] = q;
+        });
+        setQuotes((prev) => ({ ...prev, ...newQuotes }));
+      }
+    } catch (e) {
+      console.error("Failed to pre-fetch preset quotes:", e);
+    }
+    
+    const updated = [...trackedStocks, ...presets];
+    await saveTrackedStocks(updated);
+    setSelectedSymbol(presets[0].symbol);
+    setLoading(false);
+  };
+
   // 5. Sorting logic
   const getPercentDistance = useCallback((stock: TrackedStock) => {
     const quote = quotes[stock.symbol];
@@ -440,11 +522,31 @@ export default function Home() {
     });
   }, [trackedStocks, sortDirection, getPercentDistance]);
 
+  const displayedStocks = React.useMemo(() => {
+    return sortedStocks.filter((s) => {
+      const isIndian = s.symbol.endsWith(".NS") || s.symbol.endsWith(".BO");
+      return activeTab === "IN" ? isIndian : !isIndian;
+    });
+  }, [sortedStocks, activeTab]);
+
+  const activeSuggestedTickers = React.useMemo(() => {
+    return activeTab === "IN" ? INDIAN_SUGGESTED_TICKERS : SUGGESTED_TICKERS;
+  }, [activeTab]);
+
   // Helper to format currency
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat("en-US", {
+  const formatCurrency = (val: number, symbolOrCurrency?: string) => {
+    let currency = "USD";
+    if (symbolOrCurrency) {
+      if (symbolOrCurrency.length === 3) {
+        currency = symbolOrCurrency.toUpperCase();
+      } else {
+        const isIndian = symbolOrCurrency.endsWith(".NS") || symbolOrCurrency.endsWith(".BO");
+        currency = isIndian ? "INR" : "USD";
+      }
+    }
+    return new Intl.NumberFormat(currency === "INR" ? "en-IN" : "en-US", {
       style: "currency",
-      currency: "USD",
+      currency: currency,
       minimumFractionDigits: 2,
     }).format(val);
   };
@@ -577,7 +679,7 @@ export default function Home() {
         <div className="flex justify-between items-baseline mb-4">
           <div>
             <span className="text-2xl font-bold text-slate-100 dark:text-white">
-              {formatCurrency(hoveredPoint ? hoveredPoint.price : lastPrice)}
+              {formatCurrency(hoveredPoint ? hoveredPoint.price : lastPrice, selectedSymbol)}
             </span>
             <span className={`ml-2 text-sm font-semibold ${changeVal >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
               {changeVal >= 0 ? "+" : ""}{changeVal.toFixed(2)} ({formatPercent(changePct)})
@@ -721,9 +823,9 @@ export default function Home() {
           {/* Double content to scroll infinitely */}
           {[1, 2].map((loopIdx) => (
             <div key={loopIdx} className="flex items-center gap-8 pr-8">
-              {TICKER_TAPE_SYMBOLS.map((symbol) => {
+              {activeTapeSymbols.map((symbol) => {
                 const tapeQuote = tapeQuotes[symbol];
-                const displayName = symbol === "^GSPC" ? "S&P 500" : symbol === "^IXIC" ? "NASDAQ" : symbol === "^DJI" ? "DOW JONES" : symbol;
+                const displayName = symbol === "^GSPC" ? "S&P 500" : symbol === "^IXIC" ? "NASDAQ" : symbol === "^DJI" ? "DOW JONES" : symbol === "^BSESN" ? "SENSEX" : symbol === "^NSEI" ? "NIFTY 50" : symbol;
                 if (!tapeQuote) {
                   return (
                     <span key={`${loopIdx}-${symbol}`} className="text-xs font-semibold text-slate-500 flex gap-2">
@@ -781,7 +883,7 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {syncConfigured !== null && (
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900/60 text-[11px] font-medium leading-none">
                 {syncConfigured ? (
@@ -901,7 +1003,7 @@ export default function Home() {
                 {/* Autocomplete suggestions dropdown */}
                 {showSuggestions && searchQuery.trim() && (
                   <div className="absolute top-full left-0 right-0 mt-2 bg-[#0d1428] border border-slate-800 rounded-xl shadow-2xl z-20 max-h-56 overflow-y-auto divide-y divide-slate-800/50">
-                    {SUGGESTED_TICKERS.filter(
+                    {activeSuggestedTickers.filter(
                       (t) =>
                         t.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
                         t.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -927,7 +1029,7 @@ export default function Home() {
                         )}
                       </button>
                     ))}
-                    {SUGGESTED_TICKERS.filter(
+                    {activeSuggestedTickers.filter(
                       (t) =>
                         t.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
                         t.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -960,16 +1062,42 @@ export default function Home() {
 
             {/* Tracked Stocks List Grid */}
             <div className="p-6 bg-slate-900/45 border border-slate-800/80 rounded-2xl backdrop-blur-md shadow-lg flex flex-col gap-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-slate-200 flex items-center gap-2">
-                  <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.75 5.25h.008v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-                  </svg>
-                  My Stock Watchlist
-                </h2>
-                <span className="text-[11px] font-bold text-slate-500 uppercase">
-                  {trackedStocks.length} tracked assets
-                </span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/40 pb-4">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-lg font-bold text-slate-200 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.75 5.25h.008v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                    </svg>
+                    My Watchlist
+                  </h2>
+                  <span className="text-[11px] font-bold text-slate-400 bg-slate-800/40 px-2 py-0.5 rounded-full uppercase">
+                    {displayedStocks.length} tracked
+                  </span>
+                </div>
+
+                {/* Tabs Switcher */}
+                <div className="flex w-full sm:w-auto bg-[#070b16] rounded-xl p-1 border border-slate-800/80 shadow-inner">
+                  <button
+                    onClick={() => handleTabChange("US")}
+                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${
+                      activeTab === "US"
+                        ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    <span>🇺🇸</span> US Stocks
+                  </button>
+                  <button
+                    onClick={() => handleTabChange("IN")}
+                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${
+                      activeTab === "IN"
+                        ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    <span>🇮🇳</span> Indian Stocks
+                  </button>
+                </div>
               </div>
 
               {loading ? (
@@ -980,201 +1108,261 @@ export default function Home() {
                   </svg>
                   <p className="text-xs">Fetching live quotes from Yahoo Finance...</p>
                 </div>
-              ) : trackedStocks.length === 0 ? (
-                <div className="py-12 text-center border-2 border-dashed border-slate-800 rounded-xl px-4">
-                  <svg className="h-10 w-10 text-slate-600 mx-auto mb-3" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75c.621 0 1.125.504 1.125 1.125v1.875c0 .621-.504 1.125-1.125 1.125H5.625a1.125 1.125 0 01-1.125-1.125V5.625c0-.621.504-1.125 1.125-1.125z" />
-                  </svg>
-                  <p className="text-slate-400 text-sm font-medium">Your watchlist is empty.</p>
-                  <p className="text-slate-500 text-xs mt-1">Search for a ticker symbol above to start tracking portfolio performance.</p>
-                </div>
+              ) : displayedStocks.length === 0 ? (
+                activeTab === "IN" ? (
+                  <div className="py-12 text-center border border-dashed border-slate-800/80 rounded-2xl px-6 bg-slate-950/20 max-w-md mx-auto my-4 flex flex-col items-center">
+                    <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/15 flex items-center justify-center mb-4 text-xl">
+                      🇮🇳
+                    </div>
+                    <h3 className="text-slate-200 text-sm font-semibold mb-1">No Indian stocks tracked yet</h3>
+                    <p className="text-slate-400 text-xs mb-6 text-center max-w-xs leading-relaxed">
+                      Start tracking top Indian market leaders from both NSE and BSE.
+                    </p>
+                    <button
+                      onClick={handleAddDefaultIndianStocks}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl shadow-md transition flex items-center gap-2"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                      </svg>
+                      Load Preset Indian Stocks
+                    </button>
+                  </div>
+                ) : (
+                  <div className="py-12 text-center border-2 border-dashed border-slate-800 rounded-xl px-4">
+                    <svg className="h-10 w-10 text-slate-600 mx-auto mb-3" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75c.621 0 1.125.504 1.125 1.125v1.875c0 .621-.504 1.125-1.125 1.125H5.625a1.125 1.125 0 01-1.125-1.125V5.625c0-.621.504-1.125 1.125-1.125z" />
+                    </svg>
+                    <p className="text-slate-400 text-sm font-medium">Your US watchlist is empty.</p>
+                    <p className="text-slate-500 text-xs mt-1">Search for a US ticker symbol above to start tracking portfolio performance.</p>
+                  </div>
+                )
               ) : (
-                <div className="overflow-x-auto w-full">
-                  <table className="w-full text-left border-collapse min-w-[700px]">
-                    <thead>
-                      <tr className="border-b border-slate-800/80 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
-                        <th className="py-3 px-3">Asset</th>
-                        <th className="py-3 px-3">Market Price</th>
-                        <th className="py-3 px-3 w-32">Target Entry ($)</th>
-                        <th className="py-3 px-3 text-right">Distance ($)</th>
-                        <th 
-                          className="py-3 px-3 text-right cursor-pointer select-none hover:text-slate-200 transition-colors group/header"
-                          onClick={() => {
-                            setSortDirection((prev) => {
-                              if (prev === null) return "asc";
-                              if (prev === "asc") return "desc";
-                              return null;
-                            });
-                          }}
-                        >
-                          <div className="flex items-center justify-end gap-1.5">
-                            <span>Distance (%)</span>
-                            <span className="text-slate-500 group-hover/header:text-slate-300 transition-colors">
-                              {sortDirection === "asc" ? (
-                                <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
-                                </svg>
-                              ) : sortDirection === "desc" ? (
-                                <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                                </svg>
-                              ) : (
-                                <svg className="w-3.5 h-3.5 opacity-40 group-hover/header:opacity-100" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
-                                </svg>
-                              )}
-                            </span>
-                          </div>
-                        </th>
-                        <th className="py-3 px-3 text-center">Trend</th>
-                        <th className="py-3 px-1 text-center"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/40">
-                      {sortedStocks.map((stock) => {
-                        const quote = quotes[stock.symbol];
-                        const flash = priceFlash[stock.symbol];
-                        const isSelected = selectedSymbol === stock.symbol;
-
-                        // Calculations per row
-                        const qty = parseFloat(stock.quantity) || 0;
-                        const entry = parseFloat(stock.entryPrice) || 0;
-                        const currentPrice = quote?.price || 0;
-                        
-                        // Target Cost is the capital needed if entered at target entry price
-                        const targetCost = entry * qty;
-                        
-                        // Distance to Target is how far the current price is from the target entry price
-                        const diffVal = currentPrice - entry;
-                        const diffPercent = entry > 0 ? (diffVal / entry) * 100 : 0;
-                        const isTriggered = entry > 0 && currentPrice <= entry;
-
-                        return (
-                          <tr
-                            key={stock.symbol}
-                            className={`group border-b border-slate-800/30 text-sm transition-all duration-150 hover:bg-slate-800/25 ${
-                              isSelected ? "bg-indigo-900/10 border-l-2 border-l-indigo-500" : ""
-                            }`}
+                <>
+                  {/* Desktop watchlist table (visible on md and up) */}
+                  <div className="hidden md:block overflow-x-auto w-full">
+                    <table className="w-full text-left border-collapse min-w-[700px]">
+                      <thead>
+                        <tr className="border-b border-slate-800/80 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                          <th className="py-3 px-3">Asset</th>
+                          <th className="py-3 px-3">Market Price</th>
+                          <th className="py-3 px-3 w-32">Target Entry ({activeTab === "IN" ? "₹" : "$"})</th>
+                          <th 
+                            className="py-3 px-3 text-right cursor-pointer select-none hover:text-slate-200 transition-colors group/header"
+                            onClick={() => {
+                              setSortDirection((prev) => {
+                                if (prev === null) return "asc";
+                                if (prev === "asc") return "desc";
+                                return null;
+                              });
+                            }}
                           >
-                            {/* Asset info */}
-                            <td
-                              onClick={() => setSelectedSymbol(stock.symbol)}
-                              className="py-4 px-3 cursor-pointer select-none"
-                            >
-                              <div className="flex flex-col">
-                                <span className="font-bold text-slate-100 group-hover:text-indigo-400 transition-colors">
-                                  {stock.symbol}
-                                </span>
-                                <span className="text-xs text-slate-400 truncate max-w-xs mt-0.5">
-                                  {quote?.name || "Loading..."}
-                                </span>
-                              </div>
-                            </td>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <span>Distance (%)</span>
+                              <span className="text-slate-500 group-hover/header:text-slate-300 transition-colors">
+                                {sortDirection === "asc" ? (
+                                  <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+                                  </svg>
+                                ) : sortDirection === "desc" ? (
+                                  <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                                  </svg>
+                                ) : (
+                                  <svg className="w-3.5 h-3.5 opacity-40 group-hover/header:opacity-100" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
+                                  </svg>
+                                )}
+                              </span>
+                            </div>
+                          </th>
+                          <th className="py-3 px-3 text-center">Trend</th>
+                          <th className="py-3 px-1 text-center"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/40">
+                        {displayedStocks.map((stock) => {
+                          const quote = quotes[stock.symbol];
+                          const flash = priceFlash[stock.symbol];
+                          const isSelected = selectedSymbol === stock.symbol;
 
-                            {/* Current Price */}
-                            <td
-                              onClick={() => setSelectedSymbol(stock.symbol)}
-                              className="py-4 px-3 font-mono font-bold cursor-pointer select-none"
+                          // Calculations per row
+                          const qty = parseFloat(stock.quantity) || 0;
+                          const entry = parseFloat(stock.entryPrice) || 0;
+                          const currentPrice = quote?.price || 0;
+                          
+                          // Target Cost is the capital needed if entered at target entry price
+                          const targetCost = entry * qty;
+                          
+                          // Distance to Target is how far the current price is from the target entry price
+                          const diffVal = currentPrice - entry;
+                          const diffPercent = entry > 0 ? (diffVal / entry) * 100 : 0;
+                          const isTriggered = entry > 0 && currentPrice <= entry;
+
+                          return (
+                            <tr
+                              key={stock.symbol}
+                              className={`group border-b border-slate-800/30 text-sm transition-all duration-150 hover:bg-slate-800/25 ${
+                                isSelected ? "bg-indigo-900/10 border-l-2 border-l-indigo-500" : ""
+                              }`}
                             >
-                              {quote ? (
+                              {/* Asset info */}
+                              <td
+                                onClick={() => setSelectedSymbol(stock.symbol)}
+                                className="py-4 px-3 cursor-pointer select-none"
+                              >
                                 <div className="flex flex-col">
-                                  <span
-                                    className={`px-1.5 py-0.5 rounded transition ${
-                                      flash === "up"
-                                        ? "flash-green-bg font-extrabold"
-                                        : flash === "down"
-                                        ? "flash-red-bg font-extrabold"
-                                        : "text-slate-100"
-                                    }`}
-                                  >
-                                    {formatCurrency(quote.price)}
+                                  <span className="font-bold text-slate-100 group-hover:text-indigo-400 transition-colors">
+                                    {stock.symbol}
                                   </span>
-                                  <span
-                                    className={`text-[11px] font-semibold mt-0.5 px-1.5 ${
-                                      quote.changePercent >= 0 ? "text-emerald-500" : "text-rose-500"
-                                    }`}
-                                  >
-                                    {quote.changePercent >= 0 ? "+" : ""}
-                                    {quote.changePercent.toFixed(2)}%
+                                  <span className="text-xs text-slate-400 truncate max-w-xs mt-0.5">
+                                    {quote?.name || "Loading..."}
                                   </span>
                                 </div>
-                              ) : (
-                                <span className="text-slate-600 italic text-xs">Fetching...</span>
-                              )}
-                            </td>
+                              </td>
 
-                            {/* Entry Price Input */}
-                            <td className="py-4 px-3">
-                              <div className="relative">
-                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-semibold">$</span>
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  value={stock.entryPrice}
-                                  onChange={(e) =>
-                                    handleUpdateStockInput(stock.symbol, "entryPrice", e.target.value)
-                                  }
-                                  placeholder="0.00"
-                                  className="w-full bg-[#070b16]/70 border border-slate-800 hover:border-slate-700 focus:border-indigo-500 focus:bg-[#070b16] text-xs font-mono font-semibold py-1.5 pl-5 pr-1.5 rounded-lg text-slate-200 outline-none transition"
-                                />
-                              </div>
-                            </td>
-
-
-                            {/* Distance ($) */}
-                            <td
-                              onClick={() => setSelectedSymbol(stock.symbol)}
-                              className="py-4 px-3 text-right cursor-pointer select-none font-mono font-bold"
-                            >
-                              {quote && entry > 0 ? (
-                                <span className={isTriggered ? "text-emerald-400" : "text-slate-300"}>
-                                  {isTriggered ? "" : "+"}{formatCurrency(diffVal)}
-                                </span>
-                              ) : (
-                                <span className="text-slate-600 text-xs italic">---</span>
-                              )}
-                            </td>
-
-                            {/* Distance (%) */}
-                            <td
-                              onClick={() => setSelectedSymbol(stock.symbol)}
-                              className="py-4 px-3 text-right cursor-pointer select-none font-mono font-bold"
-                            >
-                              {quote && entry > 0 ? (
-                                <div className="flex flex-col items-end">
-                                  <span className={isTriggered ? "text-emerald-400" : "text-slate-300"}>
-                                    {isTriggered ? "" : "+"}{diffPercent.toFixed(2)}%
-                                  </span>
-                                  {isTriggered && (
-                                    <span className="text-[9px] text-emerald-500 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded mt-0.5 flex items-center gap-0.5 uppercase tracking-wider">
-                                      <span className="w-1 h-1 bg-emerald-500 rounded-full animate-pulse"></span>
-                                      Buy Zone
+                              {/* Current Price */}
+                              <td
+                                onClick={() => setSelectedSymbol(stock.symbol)}
+                                className="py-4 px-3 font-mono font-bold cursor-pointer select-none"
+                              >
+                                {quote ? (
+                                  <div className="flex flex-col">
+                                    <span
+                                      className={`px-1.5 py-0.5 rounded transition ${
+                                        flash === "up"
+                                          ? "flash-green-bg font-extrabold"
+                                          : flash === "down"
+                                          ? "flash-red-bg font-extrabold"
+                                          : "text-slate-100"
+                                      }`}
+                                    >
+                                      {formatCurrency(quote.price, stock.symbol)}
                                     </span>
-                                  )}
+                                    <span
+                                      className={`text-[11px] font-semibold mt-0.5 px-1.5 ${
+                                        quote.changePercent >= 0 ? "text-emerald-500" : "text-rose-500"
+                                      }`}
+                                    >
+                                      {quote.changePercent >= 0 ? "+" : ""}
+                                      {quote.changePercent.toFixed(2)}%
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-600 italic text-xs">Fetching...</span>
+                                )}
+                              </td>
+
+                              {/* Entry Price Input */}
+                              <td className="py-4 px-3">
+                                <div className="relative">
+                                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-semibold">{stock.symbol.endsWith(".NS") || stock.symbol.endsWith(".BO") ? "₹" : "$"}</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={stock.entryPrice}
+                                    onChange={(e) =>
+                                      handleUpdateStockInput(stock.symbol, "entryPrice", e.target.value)
+                                    }
+                                    placeholder="0.00"
+                                    className="w-full bg-[#070b16]/70 border border-slate-800 hover:border-slate-700 focus:border-indigo-500 focus:bg-[#070b16] text-xs font-mono font-semibold py-1.5 pl-5 pr-1.5 rounded-lg text-slate-200 outline-none transition"
+                                  />
                                 </div>
-                              ) : (
-                                <span className="text-slate-600 text-xs italic">---</span>
-                              )}
-                            </td>
+                              </td>
 
-                            {/* Sparkline Chart - Click opens TradingView */}
-                            <td
-                              className="py-4 px-3 cursor-pointer select-none flex items-center justify-center group/trend"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedSymbol(stock.symbol);
-                                window.open(`https://www.tradingview.com/chart/?symbol=${stock.symbol.toUpperCase()}`, "_blank", "noopener,noreferrer");
-                              }}
-                              title={`Open ${stock.symbol} chart on TradingView`}
-                            >
-                              <div className="transition-transform duration-200 group-hover/trend:scale-105">
-                                {renderSparkline(stock.symbol, sparklines[stock.symbol])}
-                              </div>
-                            </td>
+                              {/* Distance (%) */}
+                              <td
+                                onClick={() => setSelectedSymbol(stock.symbol)}
+                                className="py-4 px-3 text-right cursor-pointer select-none font-mono font-bold"
+                              >
+                                {quote && entry > 0 ? (
+                                  <div className="flex flex-col items-end">
+                                    <span className={isTriggered ? "text-emerald-400" : "text-slate-300"}>
+                                      {isTriggered ? "" : "+"}{diffPercent.toFixed(2)}%
+                                    </span>
+                                    {isTriggered && (
+                                      <span className="text-[9px] text-emerald-500 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded mt-0.5 flex items-center gap-0.5 uppercase tracking-wider">
+                                        <span className="w-1 h-1 bg-emerald-500 rounded-full animate-pulse"></span>
+                                        Buy Zone
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-600 text-xs italic">---</span>
+                                )}
+                              </td>
 
-                            {/* Actions Delete button */}
-                            <td className="py-4 px-1 text-center">
+                              {/* Sparkline Chart - Click opens TradingView */}
+                              <td
+                                className="py-4 px-3 cursor-pointer select-none flex items-center justify-center group/trend"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedSymbol(stock.symbol);
+                                  window.open(`https://www.tradingview.com/chart/?symbol=${stock.symbol.toUpperCase()}`, "_blank", "noopener,noreferrer");
+                                }}
+                                title={`Open ${stock.symbol} chart on TradingView`}
+                              >
+                                <div className="transition-transform duration-200 group-hover/trend:scale-105">
+                                  {renderSparkline(stock.symbol, sparklines[stock.symbol])}
+                                </div>
+                              </td>
+
+                              {/* Actions Delete button */}
+                              <td className="py-4 px-1 text-center">
+                                <button
+                                  onClick={() => handleRemoveStock(stock.symbol)}
+                                  className="p-1.5 text-rose-400/70 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                                  title={`Stop tracking ${stock.symbol}`}
+                                >
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile watchlist card stack (visible only on mobile) */}
+                  <div className="md:hidden flex flex-col gap-3">
+                    {displayedStocks.map((stock) => {
+                      const quote = quotes[stock.symbol];
+                      const flash = priceFlash[stock.symbol];
+                      const isSelected = selectedSymbol === stock.symbol;
+
+                      const entry = parseFloat(stock.entryPrice) || 0;
+                      const currentPrice = quote?.price || 0;
+                      
+                      const diffVal = currentPrice - entry;
+                      const diffPercent = entry > 0 ? (diffVal / entry) * 100 : 0;
+                      const isTriggered = entry > 0 && currentPrice <= entry;
+
+                      return (
+                        <div
+                          key={stock.symbol}
+                          onClick={() => setSelectedSymbol(stock.symbol)}
+                          className={`p-4 rounded-xl border transition-all duration-150 flex flex-col gap-3 cursor-pointer ${
+                            isSelected
+                              ? "bg-indigo-950/20 border-indigo-500/60 shadow-indigo-500/5 shadow-md"
+                              : "bg-slate-900/30 border-slate-800/60 hover:bg-slate-800/10"
+                          }`}
+                        >
+                          {/* Mobile card header */}
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <span className="font-bold text-slate-100 text-sm">
+                                {stock.symbol}
+                              </span>
+                              <span className="text-xs text-slate-400 block truncate max-w-[180px] mt-0.5">
+                                {quote?.name || "Loading..."}
+                              </span>
+                            </div>
+                            
+                            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                               <button
                                 onClick={() => handleRemoveStock(stock.symbol)}
                                 className="p-1.5 text-rose-400/70 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
@@ -1184,13 +1372,91 @@ export default function Home() {
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
                               </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                            </div>
+                          </div>
+
+                          {/* Mobile card body */}
+                          <div className="grid grid-cols-3 gap-2 items-center border-t border-b border-slate-800/40 py-2.5">
+                            {/* Price */}
+                            <div className="flex flex-col">
+                              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-0.5">Price</span>
+                              {quote ? (
+                                <div className="flex flex-col">
+                                  <span className={`font-mono font-bold text-xs ${
+                                    flash === "up" ? "text-emerald-400 font-extrabold" : flash === "down" ? "text-rose-400 font-extrabold text-xs" : "text-slate-100 text-xs"
+                                  }`}>
+                                    {formatCurrency(quote.price, stock.symbol)}
+                                  </span>
+                                  <span className={`text-[10px] font-semibold mt-0.5 ${
+                                    quote.changePercent >= 0 ? "text-emerald-500" : "text-rose-500"
+                                  }`}>
+                                    {quote.changePercent >= 0 ? "+" : ""}{quote.changePercent.toFixed(2)}%
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-slate-600 italic text-xs">Fetching...</span>
+                              )}
+                            </div>
+
+                            {/* Sparkline */}
+                            <div className="flex flex-col items-center">
+                              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-0.5">Trend</span>
+                              <div
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedSymbol(stock.symbol);
+                                  window.open(`https://www.tradingview.com/chart/?symbol=${stock.symbol.toUpperCase()}`, "_blank", "noopener,noreferrer");
+                                }}
+                              >
+                                {renderSparkline(stock.symbol, sparklines[stock.symbol])}
+                              </div>
+                            </div>
+
+                            {/* Distance (%) */}
+                            <div className="flex flex-col items-end">
+                              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-0.5">Distance</span>
+                              {quote && entry > 0 ? (
+                                <div className="flex flex-col items-end">
+                                  <span className={`font-mono font-bold text-xs ${isTriggered ? "text-emerald-400" : "text-slate-300"}`}>
+                                    {diffPercent.toFixed(2)}%
+                                  </span>
+                                  {isTriggered && (
+                                    <span className="text-[8px] text-emerald-500 font-bold bg-emerald-500/10 px-1 py-0.5 rounded mt-0.5 uppercase tracking-wider">
+                                      Buy Zone
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-slate-600 text-xs italic">---</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Input Target */}
+                          <div className="flex items-center justify-between gap-3 text-xs" onClick={(e) => e.stopPropagation()}>
+                            <span className="text-slate-400 font-medium whitespace-nowrap">Target Entry:</span>
+                            <div className="relative max-w-[140px] flex-1">
+                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-semibold">
+                                {stock.symbol.endsWith(".NS") || stock.symbol.endsWith(".BO") ? "₹" : "$"}
+                              </span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={stock.entryPrice}
+                                onChange={(e) =>
+                                  handleUpdateStockInput(stock.symbol, "entryPrice", e.target.value)
+                                }
+                                placeholder="0.00"
+                                className="w-full bg-[#070b16]/70 border border-slate-800 hover:border-slate-700 focus:border-indigo-500 focus:bg-[#070b16] text-xs font-mono font-semibold py-1.5 pl-5 pr-1.5 rounded-lg text-slate-200 outline-none transition"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </div>
           </section>
@@ -1249,7 +1515,7 @@ export default function Home() {
                         <div className="flex justify-between border-b border-slate-800/30 pb-1">
                           <span className="text-slate-500">Market Cap</span>
                           <span className="font-bold text-slate-300">
-                            {formatNumber(quotes[selectedSymbol].marketCap)}
+                            {quotes[selectedSymbol].currency === "INR" ? "₹" : "$"}{formatNumber(quotes[selectedSymbol].marketCap)}
                           </span>
                         </div>
                         <div className="flex justify-between border-b border-slate-800/30 pb-1">
@@ -1261,13 +1527,13 @@ export default function Home() {
                         <div className="flex justify-between border-b border-slate-800/30 pb-1">
                           <span className="text-slate-500">Open Price</span>
                           <span className="font-bold text-slate-300">
-                            {formatCurrency(quotes[selectedSymbol].open)}
+                            {formatCurrency(quotes[selectedSymbol].open, selectedSymbol)}
                           </span>
                         </div>
                         <div className="flex justify-between border-b border-slate-800/30 pb-1">
                           <span className="text-slate-500">Prev Close</span>
                           <span className="font-bold text-slate-300">
-                            {formatCurrency(quotes[selectedSymbol].previousClose)}
+                            {formatCurrency(quotes[selectedSymbol].previousClose, selectedSymbol)}
                           </span>
                         </div>
                         <div className="flex justify-between border-b border-slate-800/30 pb-1">
@@ -1279,7 +1545,7 @@ export default function Home() {
                         <div className="flex justify-between border-b border-slate-800/30 pb-1">
                           <span className="text-slate-500">Day Range</span>
                           <span className="font-bold text-slate-300">
-                            {formatCurrency(quotes[selectedSymbol].low)} - {formatCurrency(quotes[selectedSymbol].high)}
+                            {formatCurrency(quotes[selectedSymbol].low, selectedSymbol)} - {formatCurrency(quotes[selectedSymbol].high, selectedSymbol)}
                           </span>
                         </div>
                       </div>
