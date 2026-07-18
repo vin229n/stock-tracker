@@ -143,20 +143,18 @@ export default function Home() {
           }
           if (data.stocks && Array.isArray(data.stocks)) {
             setTrackedStocks(data.stocks);
-            if (data.stocks.length > 0) {
-              setSelectedSymbol(data.stocks[0].symbol);
-            }
+            setSelectedSymbol("");
             return;
           }
         }
         // Fallback to default
         setTrackedStocks(DEFAULT_TRACKED);
-        setSelectedSymbol(DEFAULT_TRACKED[0].symbol);
+        setSelectedSymbol("");
       } catch (error: any) {
         console.error("Error loading stocks:", error);
         setSyncError(error.message || "Failed to load stocks from database");
         setTrackedStocks(DEFAULT_TRACKED);
-        setSelectedSymbol(DEFAULT_TRACKED[0].symbol);
+        setSelectedSymbol("");
       } finally {
         setLoading(false);
       }
@@ -294,10 +292,10 @@ export default function Home() {
         if (data.stocks && Array.isArray(data.stocks)) {
           setTrackedStocks(data.stocks);
           // Check if previously selected symbol still exists
-          if (data.stocks.length > 0) {
+          if (selectedSymbol && data.stocks.length > 0) {
             const hasSelected = data.stocks.some((s: TrackedStock) => s.symbol === selectedSymbol);
             if (!hasSelected) {
-              setSelectedSymbol(data.stocks[0].symbol);
+              setSelectedSymbol("");
             }
           } else {
             setSelectedSymbol("");
@@ -442,7 +440,7 @@ export default function Home() {
     saveTrackedStocks(updated);
 
     if (selectedSymbol === symbol) {
-      setSelectedSymbol(updated.length > 0 ? updated[0].symbol : "");
+      setSelectedSymbol("");
     }
   };
 
@@ -458,15 +456,7 @@ export default function Home() {
 
   const handleTabChange = (tab: "US" | "IN") => {
     setActiveTab(tab);
-    const filtered = trackedStocks.filter((s) => {
-      const isIndian = s.symbol.endsWith(".NS") || s.symbol.endsWith(".BO");
-      return tab === "IN" ? isIndian : !isIndian;
-    });
-    if (filtered.length > 0) {
-      setSelectedSymbol(filtered[0].symbol);
-    } else {
-      setSelectedSymbol("");
-    }
+    setSelectedSymbol("");
   };
 
   const handleAddDefaultIndianStocks = async () => {
@@ -940,8 +930,8 @@ export default function Home() {
         {/* Dashboard Actions and Main Panels */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           
-          {/* Left panel: Input and Tracked List (2/3 width on wide screens) */}
-          <section className="lg:col-span-2 flex flex-col gap-6 w-full">
+          {/* Left panel: Input and Tracked List (full width) */}
+          <section className="lg:col-span-3 flex flex-col gap-6 w-full">
             
             {/* Add Stock Search Container */}
             <div className="p-6 bg-slate-900/45 border border-slate-800/80 rounded-2xl backdrop-blur-md shadow-lg flex flex-col gap-4 relative">
@@ -1456,147 +1446,162 @@ export default function Home() {
                       );
                     })}
                   </div>
-                </>
-              )}
-            </div>
-          </section>
 
-          {/* Right panel: Details Card & Interactive SVG Graph (1/3 width) */}
-          <section className="lg:col-span-1 w-full flex flex-col gap-6">
-            
-            {/* Chart Card */}
-            <div className="p-6 bg-slate-900/45 border border-slate-800/80 rounded-2xl backdrop-blur-md shadow-lg flex flex-col gap-5">
-              
-              {/* Card Header & Selected symbol selector */}
-              {selectedSymbol ? (
-                <>
-                  <div className="flex justify-between items-start">
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl font-extrabold text-slate-100">{selectedSymbol}</span>
-                        <span className="text-xs uppercase text-slate-500 font-mono tracking-wider font-semibold">
-                          {quotes[selectedSymbol]?.name ? "Active Quote" : "Selected"}
-                        </span>
-                      </div>
-                      <span className="text-xs text-slate-400 truncate max-w-[180px] mt-0.5">
-                        {quotes[selectedSymbol]?.name || "Loading metadata..."}
-                      </span>
-                    </div>
-
-                    {/* Chart range selection badges */}
-                    <div className="flex bg-[#070b16] rounded-lg p-0.5 border border-slate-800">
-                      {(["1D", "1W", "1M", "1Y"] as const).map((r) => (
-                        <button
-                          key={r}
-                          onClick={() => setChartRange(r)}
-                          className={`px-2 py-1 text-[10px] font-bold rounded-md transition ${
-                            chartRange === r
-                              ? "bg-indigo-600 text-white shadow-md"
-                              : "text-slate-400 hover:text-slate-200"
-                          }`}
-                        >
-                          {r}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Rendering SVG Chart */}
-                  <div className="border-t border-b border-slate-800/60 py-4">
-                    {renderChart()}
-                  </div>
-
-                  {/* Detailed Stock Statistics List */}
-                  {quotes[selectedSymbol] ? (
-                    <div className="flex flex-col gap-3">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Market Statistics</h3>
-                      
-                      <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs font-mono">
-                        <div className="flex justify-between border-b border-slate-800/30 pb-1">
-                          <span className="text-slate-500">Market Cap</span>
-                          <span className="font-bold text-slate-300">
-                            {quotes[selectedSymbol].currency === "INR" ? "₹" : "$"}{formatNumber(quotes[selectedSymbol].marketCap)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between border-b border-slate-800/30 pb-1">
-                          <span className="text-slate-500">Day Volume</span>
-                          <span className="font-bold text-slate-300">
-                            {formatNumber(quotes[selectedSymbol].volume)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between border-b border-slate-800/30 pb-1">
-                          <span className="text-slate-500">Open Price</span>
-                          <span className="font-bold text-slate-300">
-                            {formatCurrency(quotes[selectedSymbol].open, selectedSymbol)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between border-b border-slate-800/30 pb-1">
-                          <span className="text-slate-500">Prev Close</span>
-                          <span className="font-bold text-slate-300">
-                            {formatCurrency(quotes[selectedSymbol].previousClose, selectedSymbol)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between border-b border-slate-800/30 pb-1">
-                          <span className="text-slate-500">PE Ratio</span>
-                          <span className="font-bold text-slate-300">
-                            {quotes[selectedSymbol].pe ?? "N/A"}
-                          </span>
-                        </div>
-                        <div className="flex justify-between border-b border-slate-800/30 pb-1">
-                          <span className="text-slate-500">Day Range</span>
-                          <span className="font-bold text-slate-300">
-                            {formatCurrency(quotes[selectedSymbol].low, selectedSymbol)} - {formatCurrency(quotes[selectedSymbol].high, selectedSymbol)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-xs text-slate-500 italic text-center py-4">
-                      Loading market stats...
-                    </div>
-                  )}
-
-                  <button
-                    onClick={() => handleRemoveStock(selectedSymbol)}
-                    className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 px-3 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/15 hover:border-rose-500/30 text-rose-400 font-semibold text-xs rounded-xl transition"
-                    title={`Stop tracking ${selectedSymbol}`}
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  {/* Quick Helper Card */}
+                  <div className="p-5 bg-slate-900/25 border border-slate-800/80 rounded-2xl backdrop-blur-md shadow-lg flex gap-3 text-xs text-slate-400 mt-6">
+                    <svg className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
                     </svg>
-                    Remove from Watchlist
-                  </button>
+                    <div>
+                      <h4 className="font-bold text-slate-300 mb-1">Quick Instructions</h4>
+                      <ul className="list-disc list-inside space-y-1.5 text-slate-400 leading-relaxed">
+                        <li>Prices update in real-time every 10s.</li>
+                        <li>Click on any asset row to view its detailed chart and market statistics in a popup modal.</li>
+                        <li>Input your custom <strong className="text-slate-200">Target Entry</strong> price directly in the input field; it persists automatically.</li>
+                      </ul>
+                    </div>
+                  </div>
                 </>
-              ) : (
-                <div className="py-24 text-center text-slate-500 flex flex-col items-center">
-                  <svg className="w-8 h-8 text-slate-600 mb-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6a7.5 7.5 0 107.5 7.5h-7.5V6Z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5H21a7.5 7.5 0 00-7.5-7.5v7.5Z" />
-                  </svg>
-                  <p className="text-xs font-semibold">No asset selected.</p>
-                  <p className="text-[10px] text-slate-600 mt-1">Select an asset from your watchlist to see charts.</p>
-                </div>
               )}
             </div>
-            
-            {/* Quick Helper Card */}
-            <div className="p-5 bg-slate-900/25 border border-slate-800/80 rounded-2xl backdrop-blur-md shadow-lg flex gap-3 text-xs text-slate-400">
-              <svg className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
-              </svg>
-              <div>
-                <h4 className="font-bold text-slate-300 mb-1">Quick Instructions</h4>
-                <ul className="list-disc list-inside space-y-1 text-slate-400">
-                  <li>Prices update in real-time every 10s.</li>
-                  <li>Click on a row to open its detailed chart.</li>
-                  <li>Input your custom <strong className="text-slate-300">Target Entry</strong> price directly in the input field; it persists automatically.</li>
-                </ul>
-              </div>
-            </div>
-
           </section>
         </div>
       </div>
+
+      {/* Detailed Stock Statistics & Graph Modal */}
+      {selectedSymbol && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm transition-all duration-300">
+          {/* Backdrop Click to Close */}
+          <div className="absolute inset-0 cursor-default" onClick={() => setSelectedSymbol("")} />
+          
+          {/* Modal Card */}
+          <div className="relative w-full max-w-2xl bg-[#0b1021]/95 border border-slate-800 rounded-3xl shadow-2xl p-6 md:p-8 flex flex-col gap-6 z-10 max-h-[90vh] overflow-y-auto backdrop-blur-md transform transition-transform duration-300 scale-100">
+            {/* Close Button Icon */}
+            <button
+              onClick={() => setSelectedSymbol("")}
+              className="absolute right-6 top-6 text-slate-400 hover:text-slate-200 transition-colors p-1.5 hover:bg-slate-800/60 rounded-xl"
+              title="Close dialog"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            {/* Modal Header */}
+            <div className="flex flex-col pr-8">
+              <div className="flex flex-wrap items-baseline gap-2">
+                <span className="text-2xl font-extrabold text-slate-100 tracking-tight">{selectedSymbol}</span>
+                <span className="text-[10px] uppercase text-indigo-400 font-mono tracking-wider font-bold bg-indigo-500/10 px-2 py-0.5 rounded-md">
+                  {quotes[selectedSymbol]?.name ? "Active Quote" : "Selected"}
+                </span>
+              </div>
+              <span className="text-xs text-slate-400 font-medium mt-1 truncate">
+                {quotes[selectedSymbol]?.name || "Loading metadata..."}
+              </span>
+            </div>
+
+            {/* Price Chart Panel */}
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Historical Trend</span>
+                <div className="flex bg-[#070b16] rounded-lg p-0.5 border border-slate-800/80">
+                  {(["1D", "1W", "1M", "1Y"] as const).map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => setChartRange(r)}
+                      className={`px-3 py-1 text-[10px] font-bold rounded-md transition ${
+                        chartRange === r
+                          ? "bg-indigo-600 text-white shadow-md"
+                          : "text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Render Interactive SVG Chart */}
+              <div className="bg-[#070b16]/40 border border-slate-800/50 rounded-2xl p-4 shadow-inner">
+                {renderChart()}
+              </div>
+            </div>
+
+            {/* Market Stats Grid */}
+            {quotes[selectedSymbol] ? (
+              <div className="flex flex-col gap-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Market Statistics</h3>
+                
+                <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-xs font-mono">
+                  <div className="flex justify-between border-b border-slate-800/30 pb-1.5">
+                    <span className="text-slate-500">Market Cap</span>
+                    <span className="font-bold text-slate-350">
+                      {formatNumber(quotes[selectedSymbol].marketCap)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-800/30 pb-1.5">
+                    <span className="text-slate-500">Day Volume</span>
+                    <span className="font-bold text-slate-350">
+                      {formatNumber(quotes[selectedSymbol].volume)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-800/30 pb-1.5">
+                    <span className="text-slate-500">Open Price</span>
+                    <span className="font-bold text-slate-350">
+                      {formatCurrency(quotes[selectedSymbol].open)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-800/30 pb-1.5">
+                    <span className="text-slate-500">Prev Close</span>
+                    <span className="font-bold text-slate-350">
+                      {formatCurrency(quotes[selectedSymbol].previousClose)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-800/30 pb-1.5">
+                    <span className="text-slate-500">PE Ratio</span>
+                    <span className="font-bold text-slate-350">
+                      {quotes[selectedSymbol].pe ?? "N/A"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-800/30 pb-1.5">
+                    <span className="text-slate-500">Day Range</span>
+                    <span className="font-bold text-slate-355">
+                      {formatCurrency(quotes[selectedSymbol].low)} - {formatCurrency(quotes[selectedSymbol].high)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-xs text-slate-500 italic text-center py-4">
+                Loading market statistics...
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex flex-col sm:flex-row gap-3 mt-2 border-t border-slate-800/60 pt-5">
+              <button
+                onClick={() => {
+                  handleRemoveStock(selectedSymbol);
+                  setSelectedSymbol("");
+                }}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/15 hover:border-rose-500/30 text-rose-400 font-bold text-xs rounded-xl transition"
+                title={`Stop tracking ${selectedSymbol}`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Remove from Watchlist
+              </button>
+              <button
+                onClick={() => setSelectedSymbol("")}
+                className="flex-1 py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl transition"
+              >
+                Close Details
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer bar */}
       <footer className="mt-auto w-full bg-[#070b16] border-t border-slate-800/80 py-4 px-4 text-center text-xs text-slate-500 font-mono flex flex-col sm:flex-row items-center justify-between gap-2 max-w-7xl mx-auto">
