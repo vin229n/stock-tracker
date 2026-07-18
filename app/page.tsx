@@ -24,6 +24,7 @@ interface StockQuote {
   marketCap: number;
   pe?: number | string;
   currency?: string;
+  sector?: string;
 }
 
 // Structure of chart data points
@@ -80,6 +81,18 @@ const DEFAULT_TRACKED: TrackedStock[] = [
   { symbol: "NVDA", entryPrice: "115.00", quantity: "20" },
 ];
 
+const deduplicateStocks = (stocks: TrackedStock[]): TrackedStock[] => {
+  const seen = new Set<string>();
+  return stocks.filter((s) => {
+    const symbolUpper = s.symbol.toUpperCase();
+    if (seen.has(symbolUpper)) {
+      return false;
+    }
+    seen.add(symbolUpper);
+    return true;
+  });
+};
+
 export default function Home() {
   const [mounted, setMounted] = useState(false);
   const [trackedStocks, setTrackedStocks] = useState<TrackedStock[]>([]);
@@ -117,7 +130,8 @@ export default function Home() {
   // Flash state to track recent price movements for green/red highlights
   const [priceFlash, setPriceFlash] = useState<Record<string, "up" | "down" | null>>({});
 
-  // Sorting state for % distance column
+  // Sorting state
+  const [sortField, setSortField] = useState<"distance" | "sector" | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(null);
 
   // Google Sheets Cloud Sync State
@@ -128,7 +142,7 @@ export default function Home() {
   // 1. Initial mounting check and loading from Google Sheets API / Server Database
   useEffect(() => {
     setMounted(true);
-    
+
     const loadStocks = async () => {
       setLoading(true);
       setSyncError(null);
@@ -142,40 +156,41 @@ export default function Home() {
             setSyncError(data.error);
           }
           if (data.stocks && Array.isArray(data.stocks)) {
-            setTrackedStocks(data.stocks);
+            setTrackedStocks(deduplicateStocks(data.stocks));
             setSelectedSymbol("");
             return;
           }
         }
         // Fallback to default
-        setTrackedStocks(DEFAULT_TRACKED);
+        setTrackedStocks(deduplicateStocks(DEFAULT_TRACKED));
         setSelectedSymbol("");
       } catch (error: any) {
         console.error("Error loading stocks:", error);
         setSyncError(error.message || "Failed to load stocks from database");
-        setTrackedStocks(DEFAULT_TRACKED);
+        setTrackedStocks(deduplicateStocks(DEFAULT_TRACKED));
         setSelectedSymbol("");
       } finally {
         setLoading(false);
       }
     };
-    
+
     loadStocks();
   }, []);
 
   // Sync trackedStocks state to Google Sheets API / Server Database
   const saveTrackedStocks = async (stocks: TrackedStock[]) => {
+    const deduped = deduplicateStocks(stocks);
     // Update local state immediately for UI responsiveness (Optimistic UI)
-    setTrackedStocks(stocks);
+    setTrackedStocks(deduped);
     setSyncError(null);
-    
+
     try {
       const res = await fetch("/api/stocks", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ stocks }),
+        body: JSON.stringify({ stocks: deduped }),
       });
       const data = await res.json();
       setSyncConfigured(data.configured);
@@ -454,6 +469,23 @@ export default function Home() {
     saveTrackedStocks(updated);
   };
 
+  const handleEditTargetPrice = (symbol: string, currentVal: string) => {
+    const newVal = window.prompt(`Enter target entry price for ${symbol}:`, currentVal);
+    if (newVal !== null) {
+      const trimmed = newVal.trim();
+      if (trimmed === "") {
+        handleUpdateStockInput(symbol, "entryPrice", "");
+      } else {
+        const parsed = parseFloat(trimmed);
+        if (!isNaN(parsed) && parsed >= 0) {
+          handleUpdateStockInput(symbol, "entryPrice", parsed.toFixed(2));
+        } else {
+          alert("Please enter a valid positive number.");
+        }
+      }
+    }
+  };
+
   const handleTabChange = (tab: "US" | "IN") => {
     setActiveTab(tab);
     setSelectedSymbol("");
@@ -466,7 +498,7 @@ export default function Home() {
       { symbol: "TCS.BO", entryPrice: "3800.00", quantity: "5" },
       { symbol: "HDFCBANK.NS", entryPrice: "1500.00", quantity: "15" },
     ];
-    
+
     try {
       const symbols = presets.map((p) => p.symbol).join(",");
       const res = await fetch(`/api/stock?symbols=${symbols}`);
@@ -481,7 +513,7 @@ export default function Home() {
     } catch (e) {
       console.error("Failed to pre-fetch preset quotes:", e);
     }
-    
+
     const updated = [...trackedStocks, ...presets];
     await saveTrackedStocks(updated);
     setSelectedSymbol(presets[0].symbol);
@@ -498,19 +530,22 @@ export default function Home() {
   }, [quotes]);
 
   const sortedStocks = React.useMemo(() => {
-    if (!sortDirection) return trackedStocks;
+    if (!sortField || !sortDirection) return trackedStocks;
 
     return [...trackedStocks].sort((a, b) => {
-      const distA = getPercentDistance(a);
-      const distB = getPercentDistance(b);
-
-      if (sortDirection === "asc") {
-        return distA - distB;
-      } else {
-        return distB - distA;
+      if (sortField === "distance") {
+        const distA = getPercentDistance(a);
+        const distB = getPercentDistance(b);
+        return sortDirection === "asc" ? distA - distB : distB - distA;
+      } else if (sortField === "sector") {
+        const sectorA = quotes[a.symbol]?.sector || "Other";
+        const sectorB = quotes[b.symbol]?.sector || "Other";
+        const compare = sectorA.localeCompare(sectorB);
+        return sortDirection === "asc" ? compare : -compare;
       }
+      return 0;
     });
-  }, [trackedStocks, sortDirection, getPercentDistance]);
+  }, [trackedStocks, sortField, sortDirection, getPercentDistance, quotes]);
 
   const displayedStocks = React.useMemo(() => {
     return sortedStocks.filter((s) => {
@@ -677,11 +712,11 @@ export default function Home() {
             <span className="text-xs text-slate-500 block">
               {hoveredPoint
                 ? new Date(hoveredPoint.timestamp).toLocaleString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })
+                  month: "short",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
                 : `${chartRange} Performance`}
             </span>
           </div>
@@ -769,10 +804,10 @@ export default function Home() {
   // In a real application, sparklines can load a standard small 1-day chart
   const [sparklines, setSparklines] = useState<Record<string, ChartPoint[]>>({});
   const fetchedSparklinesRef = useRef<Set<string>>(new Set());
-  
+
   useEffect(() => {
     if (!mounted) return;
-    
+
     // Load sparklines for tracked stocks
     trackedStocks.forEach((stock) => {
       if (!fetchedSparklinesRef.current.has(stock.symbol)) {
@@ -861,7 +896,7 @@ export default function Home() {
 
       {/* Main Dashboard Wrapper */}
       <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-6">
-        
+
         {/* Header Section */}
         <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-4">
           <div>
@@ -929,10 +964,10 @@ export default function Home() {
 
         {/* Dashboard Actions and Main Panels */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-          
+
           {/* Left panel: Input and Tracked List (full width) */}
           <section className="lg:col-span-3 flex flex-col gap-6 w-full">
-            
+
             {/* Add Stock Search Container */}
             <div className="p-6 bg-slate-900/45 border border-slate-800/80 rounded-2xl backdrop-blur-md shadow-lg flex flex-col gap-4 relative">
               <h2 className="text-lg font-bold text-slate-200 flex items-center gap-2">
@@ -1024,10 +1059,10 @@ export default function Home() {
                         t.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
                         t.name.toLowerCase().includes(searchQuery.toLowerCase())
                     ).length === 0 && (
-                      <div className="px-4 py-3 text-slate-500 text-xs italic">
-                        No presets found. Press &quot;Add Symbol&quot; to fetch custom ticker.
-                      </div>
-                    )}
+                        <div className="px-4 py-3 text-slate-500 text-xs italic">
+                          No presets found. Press &quot;Add Symbol&quot; to fetch custom ticker.
+                        </div>
+                      )}
                   </div>
                 )}
               </form>
@@ -1051,7 +1086,7 @@ export default function Home() {
             </div>
 
             {/* Tracked Stocks List Grid */}
-            <div className="p-6 bg-slate-900/45 border border-slate-800/80 rounded-2xl backdrop-blur-md shadow-lg flex flex-col gap-4">
+            <div className="p-0 md:p-6 bg-transparent md:bg-slate-900/45 border-0 md:border md:border-slate-800/80 rounded-none md:rounded-2xl backdrop-blur-none md:backdrop-blur-md shadow-none md:shadow-lg flex flex-col gap-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/40 pb-4">
                 <div className="flex items-center gap-3">
                   <h2 className="text-lg font-bold text-slate-200 flex items-center gap-2">
@@ -1069,21 +1104,19 @@ export default function Home() {
                 <div className="flex w-full sm:w-auto bg-[#070b16] rounded-xl p-1 border border-slate-800/80 shadow-inner">
                   <button
                     onClick={() => handleTabChange("US")}
-                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${
-                      activeTab === "US"
-                        ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md"
-                        : "text-slate-400 hover:text-slate-200"
-                    }`}
+                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${activeTab === "US"
+                      ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md"
+                      : "text-slate-400 hover:text-slate-200"
+                      }`}
                   >
                     <span>🇺🇸</span> US Stocks
                   </button>
                   <button
                     onClick={() => handleTabChange("IN")}
-                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${
-                      activeTab === "IN"
-                        ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md"
-                        : "text-slate-400 hover:text-slate-200"
-                    }`}
+                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${activeTab === "IN"
+                      ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md"
+                      : "text-slate-400 hover:text-slate-200"
+                      }`}
                   >
                     <span>🇮🇳</span> Indian Stocks
                   </button>
@@ -1136,25 +1169,62 @@ export default function Home() {
                         <tr className="border-b border-slate-800/80 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
                           <th className="py-3 px-3">Asset</th>
                           <th className="py-3 px-3">Market Price</th>
+                          <th
+                            className="py-3 px-3 text-left cursor-pointer select-none hover:text-slate-200 transition-colors group/header"
+                            onClick={() => {
+                              if (sortField !== "sector") {
+                                setSortField("sector");
+                                setSortDirection("asc");
+                              } else if (sortDirection === "asc") {
+                                setSortDirection("desc");
+                              } else {
+                                setSortField(null);
+                                setSortDirection(null);
+                              }
+                            }}
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <span>Sector</span>
+                              <span className="text-slate-500 group-hover/header:text-slate-300 transition-colors">
+                                {sortField === "sector" && sortDirection === "asc" ? (
+                                  <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+                                  </svg>
+                                ) : sortField === "sector" && sortDirection === "desc" ? (
+                                  <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                                  </svg>
+                                ) : (
+                                  <svg className="w-3.5 h-3.5 opacity-40 group-hover/header:opacity-100" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
+                                  </svg>
+                                )}
+                              </span>
+                            </div>
+                          </th>
                           <th className="py-3 px-3 w-32">Target Entry ({activeTab === "IN" ? "₹" : "$"})</th>
-                          <th 
+                          <th
                             className="py-3 px-3 text-right cursor-pointer select-none hover:text-slate-200 transition-colors group/header"
                             onClick={() => {
-                              setSortDirection((prev) => {
-                                if (prev === null) return "asc";
-                                if (prev === "asc") return "desc";
-                                return null;
-                              });
+                              if (sortField !== "distance") {
+                                setSortField("distance");
+                                setSortDirection("asc");
+                              } else if (sortDirection === "asc") {
+                                setSortDirection("desc");
+                              } else {
+                                setSortField(null);
+                                setSortDirection(null);
+                              }
                             }}
                           >
                             <div className="flex items-center justify-end gap-1.5">
                               <span>Distance (%)</span>
                               <span className="text-slate-500 group-hover/header:text-slate-300 transition-colors">
-                                {sortDirection === "asc" ? (
+                                {sortField === "distance" && sortDirection === "asc" ? (
                                   <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
                                   </svg>
-                                ) : sortDirection === "desc" ? (
+                                ) : sortField === "distance" && sortDirection === "desc" ? (
                                   <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
                                   </svg>
@@ -1180,10 +1250,10 @@ export default function Home() {
                           const qty = parseFloat(stock.quantity) || 0;
                           const entry = parseFloat(stock.entryPrice) || 0;
                           const currentPrice = quote?.price || 0;
-                          
+
                           // Target Cost is the capital needed if entered at target entry price
                           const targetCost = entry * qty;
-                          
+
                           // Distance to Target is how far the current price is from the target entry price
                           const diffVal = currentPrice - entry;
                           const diffPercent = entry > 0 ? (diffVal / entry) * 100 : 0;
@@ -1192,9 +1262,8 @@ export default function Home() {
                           return (
                             <tr
                               key={stock.symbol}
-                              className={`group border-b border-slate-800/30 text-sm transition-all duration-150 hover:bg-slate-800/25 ${
-                                isSelected ? "bg-indigo-900/10 border-l-2 border-l-indigo-500" : ""
-                              }`}
+                              className={`group border-b border-slate-800/30 text-sm transition-all duration-150 hover:bg-slate-800/25 ${isSelected ? "bg-indigo-900/10 border-l-2 border-l-indigo-500" : ""
+                                }`}
                             >
                               {/* Asset info */}
                               <td
@@ -1219,20 +1288,18 @@ export default function Home() {
                                 {quote ? (
                                   <div className="flex flex-col">
                                     <span
-                                      className={`px-1.5 py-0.5 rounded transition ${
-                                        flash === "up"
-                                          ? "flash-green-bg font-extrabold"
-                                          : flash === "down"
+                                      className={`px-1.5 py-0.5 rounded transition ${flash === "up"
+                                        ? "flash-green-bg font-extrabold"
+                                        : flash === "down"
                                           ? "flash-red-bg font-extrabold"
                                           : "text-slate-100"
-                                      }`}
+                                        }`}
                                     >
                                       {formatCurrency(quote.price, stock.symbol)}
                                     </span>
                                     <span
-                                      className={`text-[11px] font-semibold mt-0.5 px-1.5 ${
-                                        quote.changePercent >= 0 ? "text-emerald-500" : "text-rose-500"
-                                      }`}
+                                      className={`text-[11px] font-semibold mt-0.5 px-1.5 ${quote.changePercent >= 0 ? "text-emerald-500" : "text-rose-500"
+                                        }`}
                                     >
                                       {quote.changePercent >= 0 ? "+" : ""}
                                       {quote.changePercent.toFixed(2)}%
@@ -1243,21 +1310,34 @@ export default function Home() {
                                 )}
                               </td>
 
-                              {/* Entry Price Input */}
+                              {/* Sector */}
+                              <td
+                                onClick={() => setSelectedSymbol(stock.symbol)}
+                                className="py-4 px-3 cursor-pointer select-none text-left"
+                              >
+                                <span className="text-[11px] text-slate-300 bg-slate-800/40 px-2.5 py-1 rounded-lg border border-slate-850 whitespace-nowrap">
+                                  {quote?.sector || "Other"}
+                                </span>
+                              </td>
+
+                              {/* Target Entry */}
                               <td className="py-4 px-3">
-                                <div className="relative">
-                                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-semibold">{stock.symbol.endsWith(".NS") || stock.symbol.endsWith(".BO") ? "₹" : "$"}</span>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={stock.entryPrice}
-                                    onChange={(e) =>
-                                      handleUpdateStockInput(stock.symbol, "entryPrice", e.target.value)
-                                    }
-                                    placeholder="0.00"
-                                    className="w-full bg-[#070b16]/70 border border-slate-800 hover:border-slate-700 focus:border-indigo-500 focus:bg-[#070b16] text-xs font-mono font-semibold py-1.5 pl-5 pr-1.5 rounded-lg text-slate-200 outline-none transition"
-                                  />
+                                <div 
+                                  className="flex items-center gap-1.5 cursor-pointer group/edit hover:text-indigo-400 transition-colors w-fit font-mono font-semibold text-slate-350"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditTargetPrice(stock.symbol, stock.entryPrice);
+                                  }}
+                                >
+                                  <span>{entry > 0 ? formatCurrency(entry, stock.symbol) : "---"}</span>
+                                  <button 
+                                    className="text-slate-500 group-hover/edit:text-indigo-400 p-0.5 rounded transition-colors"
+                                    title="Edit target entry price"
+                                  >
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                                    </svg>
+                                  </button>
                                 </div>
                               </td>
 
@@ -1326,7 +1406,7 @@ export default function Home() {
 
                       const entry = parseFloat(stock.entryPrice) || 0;
                       const currentPrice = quote?.price || 0;
-                      
+
                       const diffVal = currentPrice - entry;
                       const diffPercent = entry > 0 ? (diffVal / entry) * 100 : 0;
                       const isTriggered = entry > 0 && currentPrice <= entry;
@@ -1335,23 +1415,29 @@ export default function Home() {
                         <div
                           key={stock.symbol}
                           onClick={() => setSelectedSymbol(stock.symbol)}
-                          className={`p-4 rounded-xl border transition-all duration-150 flex flex-col gap-3 cursor-pointer ${
-                            isSelected
-                              ? "bg-indigo-950/20 border-indigo-500/60 shadow-indigo-500/5 shadow-md"
-                              : "bg-slate-900/30 border-slate-800/60 hover:bg-slate-800/10"
-                          }`}
+                          className={`p-4 rounded-xl border transition-all duration-150 flex flex-col gap-3 cursor-pointer ${isSelected
+                            ? "bg-indigo-950/20 border-indigo-500/60 shadow-indigo-500/5 shadow-md"
+                            : "bg-slate-900/30 border-slate-800/60 hover:bg-slate-800/10"
+                            }`}
                         >
                           {/* Mobile card header */}
                           <div className="flex justify-between items-start">
                             <div>
-                              <span className="font-bold text-slate-100 text-sm">
-                                {stock.symbol}
-                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-slate-100 text-sm">
+                                  {stock.symbol}
+                                </span>
+                                {quote?.sector && (
+                                  <span className="text-[9px] text-indigo-400 font-mono font-bold bg-indigo-500/10 px-1.5 py-0.5 rounded">
+                                    {quote.sector}
+                                  </span>
+                                )}
+                              </div>
                               <span className="text-xs text-slate-400 block truncate max-w-[180px] mt-0.5">
                                 {quote?.name || "Loading..."}
                               </span>
                             </div>
-                            
+
                             <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                               <button
                                 onClick={() => handleRemoveStock(stock.symbol)}
@@ -1372,14 +1458,12 @@ export default function Home() {
                               <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-0.5">Price</span>
                               {quote ? (
                                 <div className="flex flex-col">
-                                  <span className={`font-mono font-bold text-xs ${
-                                    flash === "up" ? "text-emerald-400 font-extrabold" : flash === "down" ? "text-rose-400 font-extrabold text-xs" : "text-slate-100 text-xs"
-                                  }`}>
+                                  <span className={`font-mono font-bold text-xs ${flash === "up" ? "text-emerald-400 font-extrabold" : flash === "down" ? "text-rose-400 font-extrabold text-xs" : "text-slate-100 text-xs"
+                                    }`}>
                                     {formatCurrency(quote.price, stock.symbol)}
                                   </span>
-                                  <span className={`text-[10px] font-semibold mt-0.5 ${
-                                    quote.changePercent >= 0 ? "text-emerald-500" : "text-rose-500"
-                                  }`}>
+                                  <span className={`text-[10px] font-semibold mt-0.5 ${quote.changePercent >= 0 ? "text-emerald-500" : "text-rose-500"
+                                    }`}>
                                     {quote.changePercent >= 0 ? "+" : ""}{quote.changePercent.toFixed(2)}%
                                   </span>
                                 </div>
@@ -1388,25 +1472,11 @@ export default function Home() {
                               )}
                             </div>
 
-                            {/* Sparkline */}
-                            <div className="flex flex-col items-center">
-                              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-0.5">Trend</span>
-                              <div
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedSymbol(stock.symbol);
-                                  window.open(`https://www.tradingview.com/chart/?symbol=${stock.symbol.toUpperCase()}`, "_blank", "noopener,noreferrer");
-                                }}
-                              >
-                                {renderSparkline(stock.symbol, sparklines[stock.symbol])}
-                              </div>
-                            </div>
-
                             {/* Distance (%) */}
-                            <div className="flex flex-col items-end">
+                            <div className="flex flex-col items-center">
                               <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-0.5">Distance</span>
                               {quote && entry > 0 ? (
-                                <div className="flex flex-col items-end">
+                                <div className="flex flex-col items-center">
                                   <span className={`font-mono font-bold text-xs ${isTriggered ? "text-emerald-400" : "text-slate-300"}`}>
                                     {diffPercent.toFixed(2)}%
                                   </span>
@@ -1420,26 +1490,35 @@ export default function Home() {
                                 <span className="text-slate-600 text-xs italic">---</span>
                               )}
                             </div>
+
+                            {/* Sparkline */}
+                            <div className="flex flex-col items-end">
+                              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-0.5">Trend</span>
+                              <div
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedSymbol(stock.symbol);
+                                  window.open(`https://www.tradingview.com/chart/?symbol=${stock.symbol.toUpperCase()}`, "_blank", "noopener,noreferrer");
+                                }}
+                              >
+                                {renderSparkline(stock.symbol, sparklines[stock.symbol])}
+                              </div>
+                            </div>
                           </div>
 
-                          {/* Input Target */}
+                          {/* Target Entry Row */}
                           <div className="flex items-center justify-between gap-3 text-xs" onClick={(e) => e.stopPropagation()}>
                             <span className="text-slate-400 font-medium whitespace-nowrap">Target Entry:</span>
-                            <div className="relative max-w-[140px] flex-1">
-                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-semibold">
-                                {stock.symbol.endsWith(".NS") || stock.symbol.endsWith(".BO") ? "₹" : "$"}
-                              </span>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={stock.entryPrice}
-                                onChange={(e) =>
-                                  handleUpdateStockInput(stock.symbol, "entryPrice", e.target.value)
-                                }
-                                placeholder="0.00"
-                                className="w-full bg-[#070b16]/70 border border-slate-800 hover:border-slate-700 focus:border-indigo-500 focus:bg-[#070b16] text-xs font-mono font-semibold py-1.5 pl-5 pr-1.5 rounded-lg text-slate-200 outline-none transition"
-                              />
+                            <div 
+                              className="flex items-center gap-1.5 cursor-pointer group/edit hover:text-indigo-400 transition-colors font-mono font-semibold text-slate-350"
+                              onClick={() => handleEditTargetPrice(stock.symbol, stock.entryPrice)}
+                            >
+                              <span>{entry > 0 ? formatCurrency(entry, stock.symbol) : "---"}</span>
+                              <button className="text-slate-500 group-hover/edit:text-indigo-400 p-0.5 rounded transition-colors" title="Edit target entry price">
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                                </svg>
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -1473,7 +1552,7 @@ export default function Home() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm transition-all duration-300">
           {/* Backdrop Click to Close */}
           <div className="absolute inset-0 cursor-default" onClick={() => setSelectedSymbol("")} />
-          
+
           {/* Modal Card */}
           <div className="relative w-full max-w-2xl bg-[#0b1021]/95 border border-slate-800 rounded-3xl shadow-2xl p-6 md:p-8 flex flex-col gap-6 z-10 max-h-[90vh] overflow-y-auto backdrop-blur-md transform transition-transform duration-300 scale-100">
             {/* Close Button Icon */}
@@ -1497,6 +1576,7 @@ export default function Home() {
               </div>
               <span className="text-xs text-slate-400 font-medium mt-1 truncate">
                 {quotes[selectedSymbol]?.name || "Loading metadata..."}
+                {quotes[selectedSymbol]?.sector && ` • ${quotes[selectedSymbol].sector}`}
               </span>
             </div>
 
@@ -1509,11 +1589,10 @@ export default function Home() {
                     <button
                       key={r}
                       onClick={() => setChartRange(r)}
-                      className={`px-3 py-1 text-[10px] font-bold rounded-md transition ${
-                        chartRange === r
-                          ? "bg-indigo-600 text-white shadow-md"
-                          : "text-slate-400 hover:text-slate-200"
-                      }`}
+                      className={`px-3 py-1 text-[10px] font-bold rounded-md transition ${chartRange === r
+                        ? "bg-indigo-600 text-white shadow-md"
+                        : "text-slate-400 hover:text-slate-200"
+                        }`}
                     >
                       {r}
                     </button>
@@ -1531,7 +1610,7 @@ export default function Home() {
             {quotes[selectedSymbol] ? (
               <div className="flex flex-col gap-3">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Market Statistics</h3>
-                
+
                 <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-xs font-mono">
                   <div className="flex justify-between border-b border-slate-800/30 pb-1.5">
                     <span className="text-slate-500">Market Cap</span>

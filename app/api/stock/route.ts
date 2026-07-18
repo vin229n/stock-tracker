@@ -29,6 +29,28 @@ function writeCache(cache: Record<string, CacheEntry>) {
   }
 }
 
+const SECTOR_CACHE_FILE = path.join(process.cwd(), "sector_cache.json");
+
+function readSectorCache(): Record<string, string> {
+  try {
+    if (fs.existsSync(SECTOR_CACHE_FILE)) {
+      const data = fs.readFileSync(SECTOR_CACHE_FILE, "utf-8");
+      return JSON.parse(data);
+    }
+  } catch (e) {
+    console.error("Failed to read Sector cache file:", e);
+  }
+  return {};
+}
+
+function writeSectorCache(cache: Record<string, string>) {
+  try {
+    fs.writeFileSync(SECTOR_CACHE_FILE, JSON.stringify(cache, null, 2), "utf-8");
+  } catch (e) {
+    console.error("Failed to write Sector cache file:", e);
+  }
+}
+
 function getFallbackPe(symbol: string, price: number): number {
   let eps = 5.0; // fallback EPS
   if (symbol === "AAPL") eps = 6.50;
@@ -174,6 +196,45 @@ export async function GET(request: NextRequest) {
             }
           }
 
+          // Read from Sector cache first
+          const sectorCache = readSectorCache();
+          let sector = sectorCache[symbol];
+          if (!sector) {
+            if (symbol.startsWith("^")) {
+              sector = "Index";
+            } else if (symbol.endsWith("-USD")) {
+              sector = "Cryptocurrency";
+            } else {
+              try {
+                const summaryUrl = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=assetProfile`;
+                const summaryRes = await fetch(summaryUrl, {
+                  method: "GET",
+                  headers: {
+                    "User-Agent":
+                      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                    Accept: "application/json",
+                  },
+                  next: { revalidate: 0 },
+                });
+                if (summaryRes.ok) {
+                  const summaryData = await summaryRes.json();
+                  const profile = summaryData.quoteSummary?.result?.[0]?.assetProfile;
+                  if (profile?.sector) {
+                    sector = profile.sector;
+                  }
+                }
+              } catch (e) {
+                console.error(`Failed to fetch sector for ${symbol}:`, e);
+              }
+              if (!sector) {
+                sector = "Other";
+              }
+            }
+            // Update cache
+            sectorCache[symbol] = sector;
+            writeSectorCache(sectorCache);
+          }
+
           return {
             symbol: meta.symbol || symbol,
             name: meta.longName || meta.shortName || symbol,
@@ -188,6 +249,7 @@ export async function GET(request: NextRequest) {
             marketCap,
             pe,
             currency: meta?.currency || (symbol.endsWith(".NS") || symbol.endsWith(".BO") ? "INR" : "USD"),
+            sector,
           };
         } catch (err) {
           console.error(`Exception occurred while fetching ${symbol} quote:`, err);

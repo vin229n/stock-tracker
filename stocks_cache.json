@@ -1,12 +1,42 @@
 [
   {
-    "symbol": "INTC",
-    "entryPrice": "101.25",
+    "symbol": "NVDA",
+    "entryPrice": "208.59",
+    "quantity": "1"
+  },
+  {
+    "symbol": "MU",
+    "entryPrice": "876.28",
+    "quantity": "1"
+  },
+  {
+    "symbol": "MSFT",
+    "entryPrice": "397.31",
+    "quantity": "1"
+  },
+  {
+    "symbol": "TSLA",
+    "entryPrice": "391.3",
     "quantity": "1"
   },
   {
     "symbol": "AAPL",
-    "entryPrice": "325.59",
+    "entryPrice": "350",
+    "quantity": "1"
+  },
+  {
+    "symbol": "TSLA",
+    "entryPrice": "391.3",
+    "quantity": "1"
+  },
+  {
+    "symbol": "TRENT.NS",
+    "entryPrice": "2842.4",
+    "quantity": "1"
+  },
+  {
+    "symbol": "TRENT.NS",
+    "entryPrice": "2842.4",
     "quantity": "1"
   },
   {
@@ -32,6 +62,11 @@
   {
     "symbol": "TRENT.NS",
     "entryPrice": "2842.4",
+    "quantity": "1"
+  },
+  {
+    "symbol": "AMZN",
+    "entryPrice": "247.23",
     "quantity": "1"
   }
 ]
