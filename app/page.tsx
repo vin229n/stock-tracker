@@ -9,6 +9,12 @@ interface TrackedStock {
   quantity: string;   // Keep as string for inputs, parse when calculating
 }
 
+interface StockComment {
+  id: string;
+  text: string;
+  createdAt: string; // ISO date string
+}
+
 // Structure of quotes returned from our Next.js API
 interface StockQuote {
   symbol: string;
@@ -136,7 +142,6 @@ export default function Home() {
 
   // Google Sheets Cloud Sync State
   const [syncConfigured, setSyncConfigured] = useState<boolean | null>(null);
-  const [syncSource, setSyncSource] = useState<string>("");
   const [syncError, setSyncError] = useState<string | null>(null);
 
   // Target Price Editing Modal State
@@ -144,9 +149,15 @@ export default function Home() {
   const [editTargetPrice, setEditTargetPrice] = useState<string>("");
   const [editModalError, setEditModalError] = useState<string | null>(null);
 
-  // 1. Initial mounting check and loading from Google Sheets API / Server Database
+  // Stock Comments State
+  const [notes, setNotes] = useState<Record<string, StockComment[]>>({});
+  const [newCommentText, setNewCommentText] = useState("");
+  const [commentStatus, setCommentStatus] = useState("");
+
   useEffect(() => {
-    setMounted(true);
+    const timer = setTimeout(() => {
+      setMounted(true);
+    }, 0);
 
     const loadStocks = async () => {
       setLoading(true);
@@ -156,7 +167,6 @@ export default function Home() {
         if (res.ok) {
           const data = await res.json();
           setSyncConfigured(data.configured);
-          setSyncSource(data.source);
           if (data.error) {
             setSyncError(data.error);
           }
@@ -169,9 +179,10 @@ export default function Home() {
         // Fallback to default
         setTrackedStocks(deduplicateStocks(DEFAULT_TRACKED));
         setSelectedSymbol("");
-      } catch (error: any) {
+      } catch (error) {
         console.error("Error loading stocks:", error);
-        setSyncError(error.message || "Failed to load stocks from database");
+        const message = error instanceof Error ? error.message : "Failed to load stocks from database";
+        setSyncError(message);
         setTrackedStocks(deduplicateStocks(DEFAULT_TRACKED));
         setSelectedSymbol("");
       } finally {
@@ -179,7 +190,23 @@ export default function Home() {
       }
     };
 
+    const loadNotes = async () => {
+      try {
+        const res = await fetch("/api/notes");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.notes) {
+            setNotes(data.notes);
+          }
+        }
+      } catch (error) {
+        console.error("Error loading notes on mount:", error);
+      }
+    };
+
     loadStocks();
+    loadNotes();
+    return () => clearTimeout(timer);
   }, []);
 
   // Sync trackedStocks state to Google Sheets API / Server Database
@@ -199,13 +226,13 @@ export default function Home() {
       });
       const data = await res.json();
       setSyncConfigured(data.configured);
-      setSyncSource(data.source);
       if (!res.ok) {
         throw new Error(data.error || "Failed to save stocks list to sheet");
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Error saving tracked stocks:", err);
-      setSyncError(err.message || "Failed to save changes to cloud database");
+      const message = err instanceof Error ? err.message : "Failed to save changes to cloud database";
+      setSyncError(message);
     }
   };
 
@@ -305,7 +332,6 @@ export default function Home() {
       if (res.ok) {
         const data = await res.json();
         setSyncConfigured(data.configured);
-        setSyncSource(data.source);
         if (data.error) {
           setSyncError(data.error);
         }
@@ -327,9 +353,10 @@ export default function Home() {
       }
       // Fallback: just fetch quotes for local state if API request failed
       await fetchQuotes(trackedStocks.map((s) => s.symbol), false);
-    } catch (e: any) {
+    } catch (e) {
       console.error("Failed to refresh stock sheet and quotes:", e);
-      setSyncError(e.message || "Refresh error");
+      const message = e instanceof Error ? e.message : "Refresh error";
+      setSyncError(message);
       await fetchQuotes(trackedStocks.map((s) => s.symbol), false);
     } finally {
       setRefreshing(false);
@@ -350,9 +377,10 @@ export default function Home() {
       }
       const data: ChartResponse = await response.json();
       setChartData(data.points || []);
-    } catch (e: any) {
+    } catch (e) {
       console.error("Error fetching chart:", e);
-      setChartError(e.message || "Failed to load historical chart data.");
+      const message = e instanceof Error ? e.message : "Failed to load historical chart data.";
+      setChartError(message);
       setChartData([]);
     } finally {
       setChartLoading(false);
@@ -369,7 +397,10 @@ export default function Home() {
   useEffect(() => {
     if (!mounted) return;
     const symbolsList = trackedSymbolsString ? trackedSymbolsString.split(",") : [];
-    fetchQuotes(symbolsList);
+    
+    const timer = setTimeout(() => {
+      fetchQuotes(symbolsList);
+    }, 0);
 
     // Setup polling every 10 seconds for quotes
     const quotesInterval = setInterval(() => {
@@ -377,13 +408,17 @@ export default function Home() {
     }, 10000);
 
     return () => {
+      clearTimeout(timer);
       clearInterval(quotesInterval);
     };
   }, [mounted, trackedSymbolsString, fetchQuotes]);
 
   useEffect(() => {
     if (!mounted) return;
-    fetchTapeQuotes(activeTapeSymbols);
+
+    const timer = setTimeout(() => {
+      fetchTapeQuotes(activeTapeSymbols);
+    }, 0);
 
     // Setup polling every 30 seconds for ticker tape
     const tapeInterval = setInterval(() => {
@@ -391,6 +426,7 @@ export default function Home() {
     }, 30000);
 
     return () => {
+      clearTimeout(timer);
       clearInterval(tapeInterval);
     };
   }, [mounted, activeTapeSymbols, fetchTapeQuotes]);
@@ -398,8 +434,81 @@ export default function Home() {
   // Refetch chart when selected symbol or range changes
   useEffect(() => {
     if (!mounted || !selectedSymbol) return;
-    fetchChartData(selectedSymbol, chartRange);
+
+    const timer = setTimeout(() => {
+      fetchChartData(selectedSymbol, chartRange);
+    }, 0);
+
+    return () => clearTimeout(timer);
   }, [mounted, selectedSymbol, chartRange, fetchChartData]);
+
+  // Stock Notes/Comments functions
+  const saveComments = useCallback(async (symbol: string, updatedComments: StockComment[]) => {
+    if (!symbol) return;
+    setCommentStatus("Saving...");
+    try {
+      const response = await fetch("/api/notes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          symbol: symbol,
+          comments: updatedComments,
+        }),
+      });
+
+      if (response.ok) {
+        setNotes((prev) => ({
+          ...prev,
+          [symbol]: updatedComments,
+        }));
+        setCommentStatus("Saved");
+        setTimeout(() => {
+          setCommentStatus((current) => (current === "Saved" ? "" : current));
+        }, 2000);
+      } else {
+        setCommentStatus("Error saving");
+      }
+    } catch (e) {
+      console.error("Failed to save comments:", e);
+      setCommentStatus("Error saving");
+    }
+  }, []);
+
+  const handleAddComment = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!selectedSymbol || !newCommentText.trim()) return;
+
+    const newComment: StockComment = {
+      id: `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      text: newCommentText.trim(),
+      createdAt: new Date().toISOString(),
+    };
+
+    const currentComments = notes[selectedSymbol] || [];
+    const updatedComments = [newComment, ...currentComments];
+
+    setNewCommentText("");
+    await saveComments(selectedSymbol, updatedComments);
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!selectedSymbol) return;
+
+    const currentComments = notes[selectedSymbol] || [];
+    const updatedComments = currentComments.filter((c) => c.id !== commentId);
+
+    await saveComments(selectedSymbol, updatedComments);
+  };
+
+  // Initialize comment editor state when selectedSymbol changes
+  useEffect(() => {
+    if (selectedSymbol) {
+      setNewCommentText("");
+      setCommentStatus("");
+    }
+  }, [selectedSymbol]);
 
   // 4. Form handlers
   const handleAddStock = async (e: React.FormEvent) => {
@@ -448,7 +557,7 @@ export default function Home() {
 
       setSearchQuery("");
       setShowSuggestions(false);
-    } catch (err) {
+    } catch {
       setAddError(`Could not find ticker symbol "${symbol}". Please check and try again.`);
     } finally {
       setAddingTicker(false);
@@ -1258,12 +1367,8 @@ export default function Home() {
                           const isSelected = selectedSymbol === stock.symbol;
 
                           // Calculations per row
-                          const qty = parseFloat(stock.quantity) || 0;
                           const entry = parseFloat(stock.entryPrice) || 0;
                           const currentPrice = quote?.price || 0;
-
-                          // Target Cost is the capital needed if entered at target entry price
-                          const targetCost = entry * qty;
 
                           // Distance to Target is how far the current price is from the target entry price
                           const diffVal = currentPrice - entry;
@@ -1282,9 +1387,21 @@ export default function Home() {
                                 className="py-4 px-3 cursor-pointer select-none"
                               >
                                 <div className="flex flex-col">
-                                  <span className="font-bold text-slate-100 group-hover:text-indigo-400 transition-colors">
-                                    {stock.symbol}
-                                  </span>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-bold text-slate-100 group-hover:text-indigo-400 transition-colors">
+                                      {stock.symbol}
+                                    </span>
+                                    {notes[stock.symbol] && notes[stock.symbol].length > 0 && (
+                                      <span
+                                        className="text-indigo-400 hover:text-indigo-300 flex items-center"
+                                        title={`${notes[stock.symbol].length} comment(s) tracked`}
+                                      >
+                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                                        </svg>
+                                      </span>
+                                    )}
+                                  </div>
                                   <span className="text-xs text-slate-400 truncate max-w-xs mt-0.5">
                                     {quote?.name || "Loading..."}
                                   </span>
@@ -1438,6 +1555,16 @@ export default function Home() {
                                 <span className="font-bold text-slate-100 text-sm">
                                   {stock.symbol}
                                 </span>
+                                {notes[stock.symbol] && notes[stock.symbol].length > 0 && (
+                                  <span
+                                    className="text-indigo-400 flex items-center"
+                                    title={`${notes[stock.symbol].length} comment(s) tracked`}
+                                  >
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                                    </svg>
+                                  </span>
+                                )}
                                 {quote?.sector && (
                                   <span className="text-[9px] text-indigo-400 font-mono font-bold bg-indigo-500/10 px-1.5 py-0.5 rounded">
                                     {quote.sector}
@@ -1652,7 +1779,10 @@ export default function Home() {
       {selectedSymbol && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm transition-all duration-300">
           {/* Backdrop Click to Close */}
-          <div className="absolute inset-0 cursor-default" onClick={() => setSelectedSymbol("")} />
+          <div
+            className="absolute inset-0 cursor-default"
+            onClick={() => setSelectedSymbol("")}
+          />
 
           {/* Modal Card */}
           <div className="relative w-full max-w-2xl bg-[#0b1021]/95 border border-slate-800 rounded-3xl shadow-2xl p-6 md:p-8 flex flex-col gap-6 z-10 max-h-[90vh] overflow-y-auto backdrop-blur-md transform transition-transform duration-300 scale-100">
@@ -1756,6 +1886,92 @@ export default function Home() {
                 Loading market statistics...
               </div>
             )}
+
+            {/* Stock Notes / Comments Section */}
+            <div className="flex flex-col gap-3.5 border-t border-slate-800/60 pt-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+                  </svg>
+                  Stock Comments ({notes[selectedSymbol]?.length || 0})
+                </h3>
+                {commentStatus && (
+                  <span
+                    className={`text-[10px] font-bold font-mono transition-opacity duration-300 ${
+                      commentStatus === "Saving..."
+                        ? "text-amber-400 animate-pulse"
+                        : commentStatus === "Saved"
+                        ? "text-emerald-400"
+                        : "text-rose-400"
+                    }`}
+                  >
+                    {commentStatus}
+                  </span>
+                )}
+              </div>
+
+              {/* Draft/Add Comment Area */}
+              <form onSubmit={handleAddComment} className="flex flex-col gap-2">
+                <textarea
+                  value={newCommentText}
+                  onChange={(e) => setNewCommentText(e.target.value)}
+                  placeholder="Type a new comment or research note..."
+                  rows={2}
+                  className="w-full bg-[#070b16]/65 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-xs py-2 px-3 rounded-xl text-slate-200 placeholder-slate-600 outline-none transition resize-none leading-relaxed"
+                />
+                <button
+                  type="submit"
+                  disabled={!newCommentText.trim()}
+                  className="self-end px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-xs font-bold text-white rounded-xl transition shadow-md cursor-pointer flex items-center gap-1.5"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add Comment
+                </button>
+              </form>
+
+              {/* Comments Timeline */}
+              {notes[selectedSymbol] && notes[selectedSymbol].length > 0 ? (
+                <div className="flex flex-col gap-3 max-h-60 overflow-y-auto mt-2 pr-1 scrollbar-thin">
+                  {notes[selectedSymbol].map((comment) => (
+                    <div
+                      key={comment.id}
+                      className="relative group/comment bg-[#070b16]/30 border border-slate-850 rounded-xl p-3.5 flex flex-col gap-1.5 transition hover:border-slate-800/80"
+                    >
+                      <p className="text-xs text-slate-200 whitespace-pre-wrap leading-relaxed">
+                        {comment.text}
+                      </p>
+                      <div className="flex justify-between items-center text-[10px] text-slate-500 font-mono">
+                        <span>
+                          {new Date(comment.createdAt).toLocaleString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                        <button
+                          onClick={() => handleDeleteComment(comment.id)}
+                          className="text-rose-400/70 hover:text-rose-400 transition-colors p-1 rounded hover:bg-rose-500/10 opacity-0 group-hover/comment:opacity-100 cursor-pointer"
+                          title="Delete comment"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-6 border border-dashed border-slate-850 rounded-xl bg-[#070b16]/10 text-slate-500 text-xs italic">
+                  No comments added yet. Start tracking your research for this asset above.
+                </div>
+              )}
+            </div>
 
             {/* Modal Actions */}
             <div className="flex flex-col sm:flex-row gap-3 mt-2 border-t border-slate-800/60 pt-5">
