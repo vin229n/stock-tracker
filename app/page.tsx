@@ -505,8 +505,11 @@ export default function Home() {
   // Initialize comment editor state when selectedSymbol changes
   useEffect(() => {
     if (selectedSymbol) {
-      setNewCommentText("");
-      setCommentStatus("");
+      const timer = setTimeout(() => {
+        setNewCommentText("");
+        setCommentStatus("");
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [selectedSymbol]);
 
@@ -1955,7 +1958,7 @@ export default function Home() {
                         </span>
                         <button
                           onClick={() => handleDeleteComment(comment.id)}
-                          className="text-rose-400/70 hover:text-rose-400 transition-colors p-1 rounded hover:bg-rose-500/10 opacity-0 group-hover/comment:opacity-100 cursor-pointer"
+                          className="text-rose-400/70 hover:text-rose-400 transition-colors p-1 rounded hover:bg-rose-500/10 cursor-pointer"
                           title="Delete comment"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">

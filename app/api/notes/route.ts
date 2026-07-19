@@ -16,7 +16,7 @@ function readNotes(): NormalizedStockNotes {
   try {
     if (fs.existsSync(NOTES_CACHE_FILE)) {
       const data = fs.readFileSync(NOTES_CACHE_FILE, "utf-8");
-      const rawNotes = JSON.parse(data) as Record<string, any>;
+      const rawNotes = JSON.parse(data) as Record<string, unknown>;
       const normalizedNotes: NormalizedStockNotes = {};
       let hasMigration = false;
 
