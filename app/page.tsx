@@ -177,6 +177,32 @@ export default function Home() {
   // Flash state to track recent price movements for green/red highlights
   const [priceFlash, setPriceFlash] = useState<Record<string, "up" | "down" | null>>({});
 
+  // Theme state (dark vs light)
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+  useEffect(() => {
+    try {
+      const savedTheme = localStorage.getItem("stock_tracker_theme");
+      if (savedTheme === "light" || savedTheme === "dark") {
+        setTheme(savedTheme);
+      }
+    } catch (e) {
+      console.error("Failed to read theme preference:", e);
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    setTheme((prev) => {
+      const next = prev === "dark" ? "light" : "dark";
+      try {
+        localStorage.setItem("stock_tracker_theme", next);
+      } catch (e) {
+        console.error("Failed to save theme preference:", e);
+      }
+      return next;
+    });
+  };
+
   // Sorting state
   const [sortField, setSortField] = useState<"distance" | "sector" | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(null);
@@ -1043,9 +1069,17 @@ export default function Home() {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-[#0a0f1d] text-slate-100 selection:bg-indigo-500 selection:text-white font-sans min-h-screen">
+    <div className={`flex-1 flex flex-col font-sans min-h-screen transition-colors duration-300 ${
+      theme === "light"
+        ? "bg-slate-50 text-slate-900 selection:bg-indigo-500 selection:text-white"
+        : "bg-[#0a0f1d] text-slate-100 selection:bg-indigo-500 selection:text-white"
+    }`}>
       {/* Ticker Tape */}
-      <div className="w-full bg-[#0d1428] border-b border-slate-800/60 overflow-hidden h-10 flex items-center">
+      <div className={`w-full overflow-hidden h-10 flex items-center border-b transition-colors ${
+        theme === "light"
+          ? "bg-white border-slate-200/90 text-slate-800 shadow-xs"
+          : "bg-[#0d1428] border-slate-800/60 text-slate-100"
+      }`}>
         <div className="animate-ticker whitespace-nowrap flex items-center">
           {/* Double content to scroll infinitely */}
           {[1, 2].map((loopIdx) => (
@@ -1055,7 +1089,7 @@ export default function Home() {
                 const displayName = symbol === "^GSPC" ? "S&P 500" : symbol === "^IXIC" ? "NASDAQ" : symbol === "^DJI" ? "DOW JONES" : symbol === "^BSESN" ? "SENSEX" : symbol === "^NSEI" ? "NIFTY 50" : symbol;
                 if (!tapeQuote) {
                   return (
-                    <span key={`${loopIdx}-${symbol}`} className="text-xs font-semibold text-slate-500 flex gap-2">
+                    <span key={`${loopIdx}-${symbol}`} className={`text-xs font-semibold flex gap-2 ${theme === "light" ? "text-slate-400" : "text-slate-500"}`}>
                       {displayName}: <span className="animate-pulse">---</span>
                     </span>
                   );
@@ -1064,7 +1098,7 @@ export default function Home() {
                 return (
                   <span
                     key={`${loopIdx}-${symbol}`}
-                    className="text-xs font-semibold flex items-center gap-2 cursor-pointer hover:text-white transition-colors"
+                    className="text-xs font-semibold flex items-center gap-2 cursor-pointer transition-colors"
                     onClick={() => {
                       if (trackedStocks.some(s => s.symbol === tapeQuote.symbol)) {
                         setSelectedSymbol(tapeQuote.symbol);
@@ -1074,8 +1108,8 @@ export default function Home() {
                       }
                     }}
                   >
-                    <span className="text-slate-400">{displayName}</span>
-                    <span className="text-slate-200">{tapeQuote.price.toFixed(2)}</span>
+                    <span className={theme === "light" ? "text-slate-500 font-medium" : "text-slate-400"}>{displayName}</span>
+                    <span className={theme === "light" ? "text-slate-900 font-semibold" : "text-slate-200"}>{tapeQuote.price.toFixed(2)}</span>
                     <span className={`flex items-center gap-0.5 ${isUp ? "text-emerald-500" : "text-rose-500"}`}>
                       {isUp ? (
                         <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
@@ -1100,37 +1134,70 @@ export default function Home() {
       <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-6">
 
         {/* Header Section */}
-        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-4">
+        <header className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b pb-4 transition-colors ${
+          theme === "light" ? "border-slate-200" : "border-slate-800"
+        }`}>
           <div>
-            <h1 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
+            <h1 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500">
               Stock Tracker Dashboard
             </h1>
-            <p className="text-slate-400 text-sm mt-1">
+            <p className={theme === "light" ? "text-slate-600 text-sm mt-1" : "text-slate-400 text-sm mt-1"}>
               Live market intelligence & portfolio tracking
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            {/* Theme Toggle Button */}
+            <button
+              onClick={toggleTheme}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg border text-xs font-semibold transition-all shadow-xs ${
+                theme === "light"
+                  ? "bg-white border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                  : "bg-slate-800/80 border-slate-700/50 text-slate-200 hover:bg-slate-700/80"
+              }`}
+              title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
+            >
+              {theme === "dark" ? (
+                <>
+                  <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                  <span>Light</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                  </svg>
+                  <span>Dark</span>
+                </>
+              )}
+            </button>
+
             {syncConfigured !== null && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900/60 text-[11px] font-medium leading-none">
+              <div className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-[11px] font-medium leading-none ${
+                theme === "light"
+                  ? "border-slate-200 bg-white text-slate-700 shadow-xs"
+                  : "border-slate-800 bg-slate-900/60"
+              }`}>
                 {syncConfigured ? (
                   <>
                     <span className="relative flex h-1.5 w-1.5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
                     </span>
-                    <span className="text-emerald-400/90 font-mono">Google Sheets Synced</span>
+                    <span className="text-emerald-500 font-mono font-medium">Google Sheets Synced</span>
                   </>
                 ) : (
                   <>
                     <span className="relative flex h-1.5 w-1.5">
                       <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
                     </span>
-                    <span className="text-amber-400/90 font-mono">Local Fallback DB</span>
+                    <span className="text-amber-500 font-mono font-medium">Local Fallback DB</span>
                   </>
                 )}
                 {syncError && (
-                  <span className="text-red-400 ml-1.5 font-mono text-[10px] border-l border-slate-850 pl-1.5" title={syncError}>
+                  <span className="text-red-400 ml-1.5 font-mono text-[10px] border-l border-slate-300 dark:border-slate-850 pl-1.5" title={syncError}>
                     Sync Err!
                   </span>
                 )}
@@ -1140,7 +1207,11 @@ export default function Home() {
             <button
               onClick={handleRefreshAll}
               disabled={refreshing || loading}
-              className="flex items-center gap-2 px-3.5 py-2 bg-slate-800/80 hover:bg-slate-700/80 disabled:opacity-50 text-xs font-semibold text-slate-200 rounded-lg border border-slate-700/50 shadow-sm transition"
+              className={`flex items-center gap-2 px-3.5 py-2 disabled:opacity-50 text-xs font-semibold rounded-lg border transition shadow-xs ${
+                theme === "light"
+                  ? "bg-white hover:bg-slate-100 text-slate-700 border-slate-200"
+                  : "bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 border-slate-700/50"
+              }`}
             >
               <svg
                 className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`}
@@ -1171,9 +1242,13 @@ export default function Home() {
           <section className="lg:col-span-3 flex flex-col gap-6 w-full">
 
             {/* Add Stock Search Container */}
-            <div className="p-6 bg-slate-900/45 border border-slate-800/80 rounded-2xl backdrop-blur-md shadow-lg flex flex-col gap-4 relative">
-              <h2 className="text-lg font-bold text-slate-200 flex items-center gap-2">
-                <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <div className={`p-6 border rounded-2xl transition-all duration-300 flex flex-col gap-4 relative ${
+              theme === "light"
+                ? "bg-white border-slate-200/90 shadow-xs text-slate-900"
+                : "bg-slate-900/45 border-slate-800/80 text-slate-100 backdrop-blur-md shadow-lg"
+            }`}>
+              <h2 className={`text-lg font-bold flex items-center gap-2 ${theme === "light" ? "text-slate-900" : "text-slate-200"}`}>
+                <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 Track a New Ticker
@@ -1191,7 +1266,11 @@ export default function Home() {
                     }}
                     onFocus={() => setShowSuggestions(true)}
                     placeholder="Enter ticker (e.g. AAPL, MSFT, TSLA, BTC-USD)..."
-                    className="w-full bg-[#070b16] border border-slate-800 hover:border-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm py-2.5 px-4 rounded-xl text-slate-200 placeholder-slate-500 outline-none transition"
+                    className={`w-full border focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm py-2.5 px-4 rounded-xl outline-none transition ${
+                      theme === "light"
+                        ? "bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400 focus:bg-white"
+                        : "bg-[#070b16] border-slate-800 text-slate-200 placeholder-slate-500"
+                    }`}
                   />
                   {searchQuery && (
                     <button
@@ -1200,7 +1279,9 @@ export default function Home() {
                         setSearchQuery("");
                         setShowSuggestions(false);
                       }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                      className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors ${
+                        theme === "light" ? "text-slate-400 hover:text-slate-600" : "text-slate-500 hover:text-slate-300"
+                      }`}
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -1229,7 +1310,11 @@ export default function Home() {
 
                 {/* Autocomplete suggestions dropdown */}
                 {showSuggestions && searchQuery.trim() && (
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-[#0d1428] border border-slate-800 rounded-xl shadow-2xl z-20 max-h-56 overflow-y-auto divide-y divide-slate-800/50">
+                  <div className={`absolute top-full left-0 right-0 mt-2 border rounded-xl shadow-2xl z-20 max-h-56 overflow-y-auto divide-y ${
+                    theme === "light"
+                      ? "bg-white border-slate-200 text-slate-800 divide-slate-100 shadow-xl"
+                      : "bg-[#0d1428] border-slate-800 text-slate-100 divide-slate-800/50 shadow-2xl"
+                  }`}>
                     {activeSuggestedTickers.filter(
                       (t) =>
                         t.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1243,16 +1328,18 @@ export default function Home() {
                           setShowSuggestions(false);
                           setAddError(null);
                         }}
-                        className="w-full text-left px-4 py-3 hover:bg-slate-800/40 flex justify-between items-center text-xs transition"
+                        className={`w-full text-left px-4 py-3 flex justify-between items-center text-xs transition ${
+                          theme === "light" ? "hover:bg-slate-100" : "hover:bg-slate-800/40"
+                        }`}
                       >
                         <div className="flex flex-col">
-                          <span className="font-bold text-slate-200">{ticker.symbol}</span>
-                          <span className="text-slate-400 mt-0.5">{ticker.name}</span>
+                          <span className={`font-bold ${theme === "light" ? "text-slate-900" : "text-slate-200"}`}>{ticker.symbol}</span>
+                          <span className={`mt-0.5 ${theme === "light" ? "text-slate-500" : "text-slate-400"}`}>{ticker.name}</span>
                         </div>
                         {trackedStocks.some((s) => s.symbol === ticker.symbol) ? (
-                          <span className="text-[10px] text-indigo-400 font-semibold px-2 py-0.5 bg-indigo-500/10 rounded">Tracked</span>
+                          <span className="text-[10px] text-indigo-500 font-semibold px-2 py-0.5 bg-indigo-500/10 rounded">Tracked</span>
                         ) : (
-                          <span className="text-slate-500 font-medium">Add</span>
+                          <span className={theme === "light" ? "text-slate-400 font-medium" : "text-slate-500 font-medium"}>Add</span>
                         )}
                       </button>
                     ))}
@@ -1261,7 +1348,7 @@ export default function Home() {
                         t.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
                         t.name.toLowerCase().includes(searchQuery.toLowerCase())
                     ).length === 0 && (
-                        <div className="px-4 py-3 text-slate-500 text-xs italic">
+                        <div className={`px-4 py-3 text-xs italic ${theme === "light" ? "text-slate-400" : "text-slate-500"}`}>
                           No presets found. Press &quot;Add Symbol&quot; to fetch custom ticker.
                         </div>
                       )}
@@ -1288,16 +1375,24 @@ export default function Home() {
             </div>
 
             {/* Tracked Stocks List Grid */}
-            <div className="p-0 md:p-6 bg-transparent md:bg-slate-900/45 border-0 md:border md:border-slate-800/80 rounded-none md:rounded-2xl backdrop-blur-none md:backdrop-blur-md shadow-none md:shadow-lg flex flex-col gap-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/40 pb-4">
+            <div className={`p-0 md:p-6 transition-all duration-300 border-0 md:border rounded-none md:rounded-2xl ${
+              theme === "light"
+                ? "md:bg-white md:border-slate-200/90 md:shadow-xs text-slate-900"
+                : "md:bg-slate-900/45 md:border-slate-800/80 md:backdrop-blur-md md:shadow-lg text-slate-100"
+            }`}>
+              <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 ${
+                theme === "light" ? "border-slate-200" : "border-slate-800/40"
+              }`}>
                 <div className="flex items-center gap-3">
-                  <h2 className="text-lg font-bold text-slate-200 flex items-center gap-2">
-                    <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <h2 className={`text-lg font-bold flex items-center gap-2 ${theme === "light" ? "text-slate-900" : "text-slate-200"}`}>
+                    <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.75 5.25h.008v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
                     </svg>
                     My Watchlist
                   </h2>
-                  <span className="text-[11px] font-bold text-slate-400 bg-slate-800/40 px-2 py-0.5 rounded-full uppercase">
+                  <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                    theme === "light" ? "text-slate-600 bg-slate-100" : "text-slate-400 bg-slate-800/40"
+                  }`}>
                     {displayedStocks.length} tracked
                   </span>
                 </div>
@@ -1306,7 +1401,9 @@ export default function Home() {
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
                   {/* Search Watchlist Input */}
                   <div className="relative flex-1 sm:w-64">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                    <div className={`absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none ${
+                      theme === "light" ? "text-slate-400" : "text-slate-500"
+                    }`}>
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
                       </svg>
@@ -1316,12 +1413,18 @@ export default function Home() {
                       value={filterQuery}
                       onChange={(e) => setFilterQuery(e.target.value)}
                       placeholder="Filter ticker or name..."
-                      className="w-full pl-9 pr-8 py-1.5 bg-[#070b16] border border-slate-800/80 hover:border-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl text-xs text-slate-200 placeholder-slate-500 outline-none transition-all shadow-inner"
+                      className={`w-full pl-9 pr-8 py-1.5 border focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl text-xs outline-none transition-all ${
+                        theme === "light"
+                          ? "bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400 focus:bg-white"
+                          : "bg-[#070b16] border-slate-800/80 text-slate-200 placeholder-slate-500"
+                      }`}
                     />
                     {filterQuery && (
                       <button
                         onClick={() => setFilterQuery("")}
-                        className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-500 hover:text-slate-300"
+                        className={`absolute inset-y-0 right-0 pr-2.5 flex items-center ${
+                          theme === "light" ? "text-slate-400 hover:text-slate-600" : "text-slate-500 hover:text-slate-300"
+                        }`}
                         title="Clear search"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -1332,11 +1435,17 @@ export default function Home() {
                   </div>
 
                   {/* Tabs Switcher */}
-                  <div className="flex w-full sm:w-auto bg-[#070b16] rounded-xl p-1 border border-slate-800/80 shadow-inner">
+                  <div className={`flex w-full sm:w-auto rounded-xl p-1 border ${
+                    theme === "light"
+                      ? "bg-slate-100 border-slate-200/80 shadow-xs"
+                      : "bg-[#070b16] border-slate-800/80 shadow-inner"
+                  }`}>
                     <button
                       onClick={() => handleTabChange("US")}
                       className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${activeTab === "US"
                         ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md"
+                        : theme === "light"
+                        ? "text-slate-600 hover:text-slate-900"
                         : "text-slate-400 hover:text-slate-200"
                         }`}
                     >
@@ -1346,6 +1455,8 @@ export default function Home() {
                       onClick={() => handleTabChange("IN")}
                       className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${activeTab === "IN"
                         ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md"
+                        : theme === "light"
+                        ? "text-slate-600 hover:text-slate-900"
                         : "text-slate-400 hover:text-slate-200"
                         }`}
                     >
@@ -1418,11 +1529,15 @@ export default function Home() {
                   <div className="hidden md:block overflow-x-auto w-full">
                     <table className="w-full text-left border-collapse min-w-[700px]">
                       <thead>
-                        <tr className="border-b border-slate-800/80 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                        <tr className={`border-b text-[10px] uppercase font-bold tracking-wider ${
+                          theme === "light" ? "border-slate-200 text-slate-500" : "border-slate-800/80 text-slate-500"
+                        }`}>
                           <th className="py-3 px-3">Asset</th>
                           <th className="py-3 px-3">Market Price</th>
                           <th
-                            className="py-3 px-3 text-left cursor-pointer select-none hover:text-slate-200 transition-colors group/header"
+                            className={`py-3 px-3 text-left cursor-pointer select-none transition-colors group/header ${
+                              theme === "light" ? "hover:text-slate-900" : "hover:text-slate-200"
+                            }`}
                             onClick={() => {
                               if (sortField !== "sector") {
                                 setSortField("sector");
@@ -1437,13 +1552,13 @@ export default function Home() {
                           >
                             <div className="flex items-center gap-1.5">
                               <span>Sector</span>
-                              <span className="text-slate-500 group-hover/header:text-slate-300 transition-colors">
+                              <span className="text-slate-500 group-hover/header:text-slate-400 transition-colors">
                                 {sortField === "sector" && sortDirection === "asc" ? (
-                                  <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                  <svg className="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
                                   </svg>
                                 ) : sortField === "sector" && sortDirection === "desc" ? (
-                                  <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                  <svg className="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
                                   </svg>
                                 ) : (
@@ -1456,7 +1571,9 @@ export default function Home() {
                           </th>
                           <th className="py-3 px-3 w-32">Target Entry ({activeTab === "IN" ? "₹" : "$"})</th>
                           <th
-                            className="py-3 px-3 text-right cursor-pointer select-none hover:text-slate-200 transition-colors group/header"
+                            className={`py-3 px-3 text-right cursor-pointer select-none transition-colors group/header ${
+                              theme === "light" ? "hover:text-slate-900" : "hover:text-slate-200"
+                            }`}
                             onClick={() => {
                               if (sortField !== "distance") {
                                 setSortField("distance");
@@ -1471,13 +1588,13 @@ export default function Home() {
                           >
                             <div className="flex items-center justify-end gap-1.5">
                               <span>Distance (%)</span>
-                              <span className="text-slate-500 group-hover/header:text-slate-300 transition-colors">
+                              <span className="text-slate-500 group-hover/header:text-slate-400 transition-colors">
                                 {sortField === "distance" && sortDirection === "asc" ? (
-                                  <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                  <svg className="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
                                   </svg>
                                 ) : sortField === "distance" && sortDirection === "desc" ? (
-                                  <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                  <svg className="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
                                   </svg>
                                 ) : (
@@ -1492,7 +1609,7 @@ export default function Home() {
                           <th className="py-3 px-1 text-center"></th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-800/40">
+                      <tbody className={`divide-y ${theme === "light" ? "divide-slate-200/70" : "divide-slate-800/40"}`}>
                         {displayedStocks.map((stock) => {
                           const quote = quotes[stock.symbol];
                           const flash = priceFlash[stock.symbol];
@@ -1510,8 +1627,15 @@ export default function Home() {
                           return (
                             <tr
                               key={stock.symbol}
-                              className={`group border-b border-slate-800/30 text-sm transition-all duration-150 hover:bg-slate-800/25 ${isSelected ? "bg-indigo-900/10 border-l-2 border-l-indigo-500" : ""
-                                }`}
+                              className={`group border-b text-sm transition-all duration-150 ${
+                                isSelected
+                                  ? theme === "light"
+                                    ? "bg-indigo-50/70 border-l-2 border-l-indigo-600 border-b-slate-200"
+                                    : "bg-indigo-900/10 border-l-2 border-l-indigo-500 border-b-slate-800/30"
+                                  : theme === "light"
+                                  ? "hover:bg-slate-50/80 border-b-slate-200/80"
+                                  : "hover:bg-slate-800/25 border-b-slate-800/30"
+                              }`}
                             >
                               {/* Asset info */}
                               <td
@@ -1520,12 +1644,14 @@ export default function Home() {
                               >
                                 <div className="flex flex-col">
                                   <div className="flex items-center gap-1.5">
-                                    <span className="font-bold text-slate-100 group-hover:text-indigo-400 transition-colors">
+                                    <span className={`font-bold transition-colors ${
+                                      theme === "light" ? "text-slate-900 group-hover:text-indigo-600" : "text-slate-100 group-hover:text-indigo-400"
+                                    }`}>
                                       {stock.symbol}
                                     </span>
                                     {notes[stock.symbol] && notes[stock.symbol].length > 0 && (
                                       <span
-                                        className="text-indigo-400 hover:text-indigo-300 flex items-center"
+                                        className="text-indigo-500 hover:text-indigo-600 flex items-center"
                                         title={`${notes[stock.symbol].length} comment(s) tracked`}
                                       >
                                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -1534,7 +1660,7 @@ export default function Home() {
                                       </span>
                                     )}
                                   </div>
-                                  <span className="text-xs text-slate-400 truncate max-w-xs mt-0.5">
+                                  <span className={`text-xs truncate max-w-xs mt-0.5 ${theme === "light" ? "text-slate-500" : "text-slate-400"}`}>
                                     {quote?.name || "Loading..."}
                                   </span>
                                 </div>
@@ -1552,6 +1678,8 @@ export default function Home() {
                                         ? "flash-green-bg font-extrabold"
                                         : flash === "down"
                                           ? "flash-red-bg font-extrabold"
+                                          : theme === "light"
+                                          ? "text-slate-900 font-semibold"
                                           : "text-slate-100"
                                         }`}
                                     >
@@ -1566,7 +1694,7 @@ export default function Home() {
                                     </span>
                                   </div>
                                 ) : (
-                                  <span className="text-slate-600 italic text-xs">Fetching...</span>
+                                  <span className="text-slate-400 italic text-xs">Fetching...</span>
                                 )}
                               </td>
 
@@ -1575,7 +1703,11 @@ export default function Home() {
                                 onClick={() => setSelectedSymbol(stock.symbol)}
                                 className="py-4 px-3 cursor-pointer select-none text-left"
                               >
-                                <span className="text-[11px] text-slate-300 bg-slate-800/40 px-2.5 py-1 rounded-lg border border-slate-850 whitespace-nowrap">
+                                <span className={`text-[11px] px-2.5 py-1 rounded-lg border whitespace-nowrap ${
+                                  theme === "light"
+                                    ? "text-slate-700 bg-slate-100 border-slate-200/80"
+                                    : "text-slate-300 bg-slate-800/40 border-slate-850"
+                                }`}>
                                   {quote?.sector || "Other"}
                                 </span>
                               </td>
@@ -1583,7 +1715,9 @@ export default function Home() {
                               {/* Target Entry */}
                               <td className="py-4 px-3">
                                 <div
-                                  className="flex items-center gap-1.5 cursor-pointer group/edit hover:text-indigo-400 transition-colors w-fit font-mono font-semibold text-slate-350"
+                                  className={`flex items-center gap-1.5 cursor-pointer group/edit hover:text-indigo-500 transition-colors w-fit font-mono font-semibold ${
+                                    theme === "light" ? "text-slate-700" : "text-slate-350"
+                                  }`}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleOpenEditTargetPrice(stock);
@@ -1591,7 +1725,7 @@ export default function Home() {
                                 >
                                   <span>{entry > 0 ? formatCurrency(entry, stock.symbol) : "---"}</span>
                                   <button
-                                    className="text-slate-500 group-hover/edit:text-indigo-400 p-0.5 rounded transition-colors"
+                                    className="text-slate-400 group-hover/edit:text-indigo-500 p-0.5 rounded transition-colors"
                                     title="Edit target entry price"
                                   >
                                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -1608,18 +1742,18 @@ export default function Home() {
                               >
                                 {quote && entry > 0 ? (
                                   <div className="flex flex-col items-end">
-                                    <span className={isTriggered ? "text-emerald-400" : "text-slate-300"}>
+                                    <span className={isTriggered ? "text-emerald-500 font-extrabold" : theme === "light" ? "text-slate-700 font-semibold" : "text-slate-300"}>
                                       {isTriggered ? "" : "+"}{diffPercent.toFixed(2)}%
                                     </span>
                                     {isTriggered && (
-                                      <span className="text-[9px] text-emerald-500 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded mt-0.5 flex items-center gap-0.5 uppercase tracking-wider">
+                                      <span className="text-[9px] text-emerald-600 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded mt-0.5 flex items-center gap-0.5 uppercase tracking-wider">
                                         <span className="w-1 h-1 bg-emerald-500 rounded-full animate-pulse"></span>
                                         Buy Zone
                                       </span>
                                     )}
                                   </div>
                                 ) : (
-                                  <span className="text-slate-600 text-xs italic">---</span>
+                                  <span className="text-slate-400 text-xs italic">---</span>
                                 )}
                               </td>
 
@@ -1630,7 +1764,11 @@ export default function Home() {
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   onClick={(e) => e.stopPropagation()}
-                                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-indigo-600/25 text-indigo-400 hover:text-indigo-300 border border-slate-700/60 hover:border-indigo-500/50 transition-all duration-150 shadow-sm hover:shadow-indigo-500/20 group/tv"
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all duration-150 shadow-xs group/tv ${
+                                    theme === "light"
+                                      ? "bg-slate-100 hover:bg-indigo-50 text-indigo-600 border-slate-200"
+                                      : "bg-slate-800/80 hover:bg-indigo-600/25 text-indigo-400 hover:text-indigo-300 border-slate-700/60 hover:border-indigo-500/50 shadow-sm"
+                                  }`}
                                   title={`Open ${stock.symbol} chart on TradingView`}
                                 >
                                   <svg className="w-4 h-4 transition-transform duration-200 group-hover/tv:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -1646,7 +1784,7 @@ export default function Home() {
                               <td className="py-4 px-1 text-center">
                                 <button
                                   onClick={() => handleRemoveStock(stock.symbol)}
-                                  className="p-1.5 text-rose-400/70 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                                  className="p-1.5 text-rose-400/70 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors"
                                   title={`Stop tracking ${stock.symbol}`}
                                 >
                                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -1660,12 +1798,15 @@ export default function Home() {
                       </tbody>
                     </table>
                   </div>
-
                   {/* Mobile watchlist card stack (visible only on mobile) */}
                   <div className="md:hidden flex flex-col gap-3">
                     {/* Mobile Sort Control Bar */}
-                    <div className="flex items-center justify-between bg-slate-900/40 px-3 py-2 rounded-xl border border-slate-800/60 mb-0.5 text-xs">
-                      <span className="text-slate-400 font-medium">Sort Watchlist:</span>
+                    <div className={`flex items-center justify-between px-3.5 py-2 rounded-xl border mb-0.5 text-xs transition-all ${
+                      theme === "light"
+                        ? "bg-white border-slate-200/90 shadow-sm text-slate-700"
+                        : "bg-slate-900/40 border-slate-800/60 text-slate-400"
+                    }`}>
+                      <span className={theme === "light" ? "text-slate-600 font-medium" : "text-slate-400 font-medium"}>Sort Watchlist:</span>
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => {
@@ -1680,13 +1821,15 @@ export default function Home() {
                             }
                           }}
                           className={`px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 transition-all ${sortField === "distance"
-                            ? "bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 shadow-sm"
+                            ? "bg-indigo-600/30 text-indigo-500 border border-indigo-500/40 shadow-sm"
+                            : theme === "light"
+                            ? "bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200"
                             : "bg-slate-800/60 text-slate-400 hover:text-slate-200 border border-slate-700/40"
                             }`}
                         >
                           <span>Distance</span>
                           {sortField === "distance" ? (
-                            <span className="text-indigo-400 font-bold">
+                            <span className="text-indigo-500 font-bold">
                               {sortDirection === "asc" ? "↑" : "↓"}
                             </span>
                           ) : (
@@ -1709,13 +1852,15 @@ export default function Home() {
                             }
                           }}
                           className={`px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 transition-all ${sortField === "sector"
-                            ? "bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 shadow-sm"
+                            ? "bg-indigo-600/30 text-indigo-500 border border-indigo-500/40 shadow-sm"
+                            : theme === "light"
+                            ? "bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200"
                             : "bg-slate-800/60 text-slate-400 hover:text-slate-200 border border-slate-700/40"
                             }`}
                         >
                           <span>Sector</span>
                           {sortField === "sector" ? (
-                            <span className="text-indigo-400 font-bold">
+                            <span className="text-indigo-500 font-bold">
                               {sortDirection === "asc" ? "A-Z" : "Z-A"}
                             </span>
                           ) : (
@@ -1743,21 +1888,26 @@ export default function Home() {
                         <div
                           key={stock.symbol}
                           onClick={() => setSelectedSymbol(stock.symbol)}
-                          className={`p-4 rounded-xl border transition-all duration-150 flex flex-col gap-3 cursor-pointer ${isSelected
-                            ? "bg-indigo-950/20 border-indigo-500/60 shadow-indigo-500/5 shadow-md"
-                            : "bg-slate-900/30 border-slate-800/60 hover:bg-slate-800/10"
-                            }`}
+                          className={`p-4 rounded-xl border transition-all duration-150 flex flex-col gap-3 cursor-pointer ${
+                            isSelected
+                              ? theme === "light"
+                                ? "bg-indigo-50/90 border-indigo-300 shadow-md shadow-indigo-100"
+                                : "bg-indigo-950/20 border-indigo-500/60 shadow-indigo-500/5 shadow-md"
+                              : theme === "light"
+                              ? "bg-white border-slate-200/90 shadow-md shadow-slate-200/60 hover:shadow-lg hover:border-slate-300"
+                              : "bg-slate-900/30 border-slate-800/60 hover:bg-slate-800/10"
+                          }`}
                         >
                           {/* Mobile card header */}
                           <div className="flex justify-between items-start">
                             <div>
                               <div className="flex items-center gap-1.5">
-                                <span className="font-bold text-slate-100 text-sm">
+                                <span className={`font-bold text-sm ${theme === "light" ? "text-slate-900" : "text-slate-100"}`}>
                                   {stock.symbol}
                                 </span>
                                 {notes[stock.symbol] && notes[stock.symbol].length > 0 && (
                                   <span
-                                    className="text-indigo-400 flex items-center"
+                                    className="text-indigo-500 flex items-center"
                                     title={`${notes[stock.symbol].length} comment(s) tracked`}
                                   >
                                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -1766,12 +1916,12 @@ export default function Home() {
                                   </span>
                                 )}
                                 {quote?.sector && (
-                                  <span className="text-[9px] text-indigo-400 font-mono font-bold bg-indigo-500/10 px-1.5 py-0.5 rounded">
+                                  <span className="text-[9px] text-indigo-500 font-mono font-bold bg-indigo-500/10 px-1.5 py-0.5 rounded">
                                     {quote.sector}
                                   </span>
                                 )}
                               </div>
-                              <span className="text-xs text-slate-400 block truncate max-w-[180px] mt-0.5">
+                              <span className={`text-xs block truncate max-w-[180px] mt-0.5 ${theme === "light" ? "text-slate-500" : "text-slate-400"}`}>
                                 {quote?.name || "Loading..."}
                               </span>
                             </div>
@@ -1779,7 +1929,7 @@ export default function Home() {
                             <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                               <button
                                 onClick={() => handleRemoveStock(stock.symbol)}
-                                className="p-1.5 text-rose-400/70 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                                className="p-1.5 text-rose-400/70 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors"
                                 title={`Stop tracking ${stock.symbol}`}
                               >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -1790,23 +1940,31 @@ export default function Home() {
                           </div>
 
                           {/* Mobile card body */}
-                          <div className="grid grid-cols-3 gap-2 items-center border-t border-b border-slate-800/40 py-2.5">
+                          <div className={`grid grid-cols-3 gap-2 items-center border-t border-b py-2.5 ${
+                            theme === "light" ? "border-slate-200/80" : "border-slate-800/40"
+                          }`}>
                             {/* Price */}
                             <div className="flex flex-col">
                               <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-0.5">Price</span>
                               {quote ? (
                                 <div className="flex flex-col">
-                                  <span className={`font-mono font-bold text-xs ${flash === "up" ? "text-emerald-400 font-extrabold" : flash === "down" ? "text-rose-400 font-extrabold text-xs" : "text-slate-100 text-xs"
-                                    }`}>
+                                  <span className={`font-mono font-bold text-xs ${
+                                    flash === "up"
+                                      ? "text-emerald-500 font-extrabold"
+                                      : flash === "down"
+                                      ? "text-rose-500 font-extrabold text-xs"
+                                      : theme === "light"
+                                      ? "text-slate-900 text-xs"
+                                      : "text-slate-100 text-xs"
+                                  }`}>
                                     {formatCurrency(quote.price, stock.symbol)}
                                   </span>
-                                  <span className={`text-[10px] font-semibold mt-0.5 ${quote.changePercent >= 0 ? "text-emerald-500" : "text-rose-500"
-                                    }`}>
+                                  <span className={`text-[10px] font-semibold mt-0.5 ${quote.changePercent >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
                                     {quote.changePercent >= 0 ? "+" : ""}{quote.changePercent.toFixed(2)}%
                                   </span>
                                 </div>
                               ) : (
-                                <span className="text-slate-600 italic text-xs">Fetching...</span>
+                                <span className="text-slate-400 italic text-xs">Fetching...</span>
                               )}
                             </div>
 
@@ -1826,10 +1984,10 @@ export default function Home() {
                                 }
                               }}
                             >
-                              <span className="text-[10px] uppercase font-bold text-slate-500 group-hover/dist:text-indigo-400 tracking-wider mb-0.5 flex items-center gap-0.5">
+                              <span className="text-[10px] uppercase font-bold text-slate-500 group-hover/dist:text-indigo-500 tracking-wider mb-0.5 flex items-center gap-0.5">
                                 Distance
                                 {sortField === "distance" ? (
-                                  <span className="text-indigo-400 font-extrabold">
+                                  <span className="text-indigo-500 font-extrabold">
                                     {sortDirection === "asc" ? "↑" : "↓"}
                                   </span>
                                 ) : (
@@ -1840,17 +1998,17 @@ export default function Home() {
                               </span>
                               {quote && entry > 0 ? (
                                 <div className="flex flex-col items-center">
-                                  <span className={`font-mono font-bold text-xs ${isTriggered ? "text-emerald-400" : "text-slate-300"}`}>
+                                  <span className={`font-mono font-bold text-xs ${isTriggered ? "text-emerald-500 font-extrabold" : theme === "light" ? "text-slate-700" : "text-slate-300"}`}>
                                     {diffPercent.toFixed(2)}%
                                   </span>
                                   {isTriggered && (
-                                    <span className="text-[8px] text-emerald-500 font-bold bg-emerald-500/10 px-1 py-0.5 rounded mt-0.5 uppercase tracking-wider">
+                                    <span className="text-[8px] text-emerald-600 font-bold bg-emerald-500/10 px-1 py-0.5 rounded mt-0.5 uppercase tracking-wider">
                                       Buy Zone
                                     </span>
                                   )}
                                 </div>
                               ) : (
-                                <span className="text-slate-600 text-xs italic">---</span>
+                                <span className="text-slate-400 text-xs italic">---</span>
                               )}
                             </div>
 
@@ -1862,7 +2020,11 @@ export default function Home() {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-800/80 hover:bg-indigo-600/25 text-indigo-400 hover:text-indigo-300 border border-slate-700/60 hover:border-indigo-500/50 transition-all group/tv"
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md border transition-all group/tv ${
+                                  theme === "light"
+                                    ? "bg-slate-100 hover:bg-indigo-50 text-indigo-600 border-slate-200"
+                                    : "bg-slate-800/80 hover:bg-indigo-600/25 text-indigo-400 hover:text-indigo-300 border-slate-700/60"
+                                }`}
                                 title={`Open ${stock.symbol} chart on TradingView`}
                               >
                                 <svg className="w-3.5 h-3.5 transition-transform duration-200 group-hover/tv:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -1877,13 +2039,15 @@ export default function Home() {
 
                           {/* Target Entry Row */}
                           <div className="flex items-center justify-between gap-3 text-xs" onClick={(e) => e.stopPropagation()}>
-                            <span className="text-slate-400 font-medium whitespace-nowrap">Target Entry:</span>
+                            <span className={`font-medium whitespace-nowrap ${theme === "light" ? "text-slate-500" : "text-slate-400"}`}>Target Entry:</span>
                             <div
-                              className="flex items-center gap-1.5 cursor-pointer group/edit hover:text-indigo-400 transition-colors font-mono font-semibold text-slate-350"
+                              className={`flex items-center gap-1.5 cursor-pointer group/edit hover:text-indigo-500 transition-colors font-mono font-semibold ${
+                                theme === "light" ? "text-slate-800" : "text-slate-350"
+                              }`}
                               onClick={() => handleOpenEditTargetPrice(stock)}
                             >
                               <span>{entry > 0 ? formatCurrency(entry, stock.symbol) : "---"}</span>
-                              <button className="text-slate-500 group-hover/edit:text-indigo-400 p-0.5 rounded transition-colors" title="Edit target entry price">
+                              <button className="text-slate-400 group-hover/edit:text-indigo-500 p-0.5 rounded transition-colors" title="Edit target entry price">
                                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
                                 </svg>
@@ -1905,16 +2069,24 @@ export default function Home() {
 
       {/* Edit Target Price Modal */}
       {editingStock && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm transition-all duration-300 animate-fade-in">
+        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-all duration-300 animate-fade-in ${
+          theme === "light" ? "bg-slate-900/40 backdrop-blur-xs" : "bg-slate-950/75 backdrop-blur-sm"
+        }`}>
           {/* Backdrop Click to Close */}
           <div className="absolute inset-0 cursor-default" onClick={() => setEditingStock(null)} />
 
           {/* Modal Card */}
-          <div className="relative w-full max-w-md bg-[#0b1021]/95 border border-slate-800 rounded-3xl shadow-2xl p-6 flex flex-col gap-5 z-10 backdrop-blur-md transform transition-transform duration-300 scale-100 animate-slide-up">
+          <div className={`relative w-full max-w-md border rounded-3xl p-6 flex flex-col gap-5 z-10 transform transition-transform duration-300 scale-100 animate-slide-up ${
+            theme === "light"
+              ? "bg-white border-slate-200 shadow-2xl text-slate-900"
+              : "bg-[#0b1021]/95 border-slate-800 shadow-2xl text-slate-100 backdrop-blur-md"
+          }`}>
             {/* Close Button Icon */}
             <button
               onClick={() => setEditingStock(null)}
-              className="absolute right-5 top-5 text-slate-400 hover:text-slate-200 transition-colors p-1.5 hover:bg-slate-800/60 rounded-xl cursor-pointer"
+              className={`absolute right-5 top-5 transition-colors p-1.5 rounded-xl cursor-pointer ${
+                theme === "light" ? "text-slate-400 hover:text-slate-700 hover:bg-slate-100" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+              }`}
               title="Close modal"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -1924,28 +2096,30 @@ export default function Home() {
 
             {/* Modal Header */}
             <div>
-              <h3 className="text-lg font-bold text-slate-200 flex items-center gap-2">
-                <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+              <h3 className={`text-lg font-bold flex items-center gap-2 ${theme === "light" ? "text-slate-900" : "text-slate-200"}`}>
+                <svg className="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
                 </svg>
                 Edit Target Price
               </h3>
-              <p className="text-xs text-slate-400 mt-1">
-                Configure target entry price for <span className="font-bold text-slate-200">{editingStock.symbol}</span>
+              <p className={`text-xs mt-1 ${theme === "light" ? "text-slate-500" : "text-slate-400"}`}>
+                Configure target entry price for <span className={`font-bold ${theme === "light" ? "text-slate-900" : "text-slate-200"}`}>{editingStock.symbol}</span>
               </p>
             </div>
 
             {/* Current Price & Symbol Info */}
-            <div className="bg-[#070b16]/50 border border-slate-800/60 rounded-xl p-3.5 flex justify-between items-center text-xs">
+            <div className={`border rounded-xl p-3.5 flex justify-between items-center text-xs ${
+              theme === "light" ? "bg-slate-50 border-slate-200" : "bg-[#070b16]/50 border-slate-800/60"
+            }`}>
               <div className="flex flex-col">
-                <span className="text-slate-500 font-medium">Company</span>
-                <span className="font-bold text-slate-300 truncate max-w-[200px]">
+                <span className={theme === "light" ? "text-slate-500 font-medium" : "text-slate-500 font-medium"}>Company</span>
+                <span className={`font-bold truncate max-w-[200px] ${theme === "light" ? "text-slate-800" : "text-slate-300"}`}>
                   {quotes[editingStock.symbol]?.name || "Loading..."}
                 </span>
               </div>
               <div className="flex flex-col items-end">
-                <span className="text-slate-500 font-medium">Current Price</span>
-                <span className="font-bold text-indigo-400 font-mono">
+                <span className={theme === "light" ? "text-slate-500 font-medium" : "text-slate-500 font-medium"}>Current Price</span>
+                <span className="font-bold text-indigo-500 font-mono">
                   {quotes[editingStock.symbol] ? formatCurrency(quotes[editingStock.symbol].price, editingStock.symbol) : "Loading..."}
                 </span>
               </div>
@@ -1953,7 +2127,7 @@ export default function Home() {
 
             {/* Input Form */}
             <div className="flex flex-col gap-2">
-              <label htmlFor="targetPriceInput" className="text-xs font-semibold text-slate-400">
+              <label htmlFor="targetPriceInput" className={`text-xs font-semibold ${theme === "light" ? "text-slate-700" : "text-slate-400"}`}>
                 Target Price ({editingStock.symbol.endsWith(".NS") || editingStock.symbol.endsWith(".BO") ? "₹" : "$"})
               </label>
               <div className="relative">
@@ -1974,7 +2148,11 @@ export default function Home() {
                     }
                   }}
                   placeholder="Enter positive number or leave blank"
-                  className="w-full bg-[#070b16] border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm py-2.5 px-4 rounded-xl text-slate-200 placeholder-slate-600 outline-none transition font-mono"
+                  className={`w-full border focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm py-2.5 px-4 rounded-xl outline-none transition font-mono ${
+                    theme === "light"
+                      ? "bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400 focus:bg-white"
+                      : "bg-[#070b16] border-slate-800 text-slate-200 placeholder-slate-600"
+                  }`}
                 />
               </div>
               {editModalError && (
@@ -1988,10 +2166,14 @@ export default function Home() {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex gap-3 border-t border-slate-800/60 pt-4 mt-1">
+            <div className={`flex gap-3 border-t pt-4 mt-1 ${theme === "light" ? "border-slate-200" : "border-slate-800/60"}`}>
               <button
                 onClick={() => setEditingStock(null)}
-                className="flex-1 py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl transition cursor-pointer"
+                className={`flex-1 py-2.5 px-4 font-bold text-xs rounded-xl transition cursor-pointer ${
+                  theme === "light"
+                    ? "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                    : "bg-slate-800 hover:bg-slate-700 text-slate-200"
+                }`}
               >
                 Cancel
               </button>
@@ -2008,7 +2190,9 @@ export default function Home() {
 
       {/* Detailed Stock Statistics & Graph Modal */}
       {selectedSymbol && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm transition-all duration-300">
+        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-all duration-300 ${
+          theme === "light" ? "bg-slate-900/40 backdrop-blur-xs" : "bg-slate-950/75 backdrop-blur-sm"
+        }`}>
           {/* Backdrop Click to Close */}
           <div
             className="absolute inset-0 cursor-default"
@@ -2016,11 +2200,17 @@ export default function Home() {
           />
 
           {/* Modal Card */}
-          <div className="relative w-full max-w-2xl bg-[#0b1021]/95 border border-slate-800 rounded-3xl shadow-2xl p-6 md:p-8 flex flex-col gap-6 z-10 max-h-[90vh] overflow-y-auto backdrop-blur-md transform transition-transform duration-300 scale-100">
+          <div className={`relative w-full max-w-2xl border rounded-3xl p-6 md:p-8 flex flex-col gap-6 z-10 max-h-[90vh] overflow-y-auto transform transition-transform duration-300 scale-100 ${
+            theme === "light"
+              ? "bg-white border-slate-200 shadow-2xl text-slate-900"
+              : "bg-[#0b1021]/95 border-slate-800 shadow-2xl text-slate-100 backdrop-blur-md"
+          }`}>
             {/* Close Button Icon */}
             <button
               onClick={() => setSelectedSymbol("")}
-              className="absolute right-6 top-6 text-slate-400 hover:text-slate-200 transition-colors p-1.5 hover:bg-slate-800/60 rounded-xl"
+              className={`absolute right-6 top-6 transition-colors p-1.5 rounded-xl ${
+                theme === "light" ? "text-slate-400 hover:text-slate-700 hover:bg-slate-100" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+              }`}
               title="Close dialog"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -2031,12 +2221,12 @@ export default function Home() {
             {/* Modal Header */}
             <div className="flex flex-col pr-8">
               <div className="flex flex-wrap items-baseline gap-2">
-                <span className="text-2xl font-extrabold text-slate-100 tracking-tight">{selectedSymbol}</span>
-                <span className="text-[10px] uppercase text-indigo-400 font-mono tracking-wider font-bold bg-indigo-500/10 px-2 py-0.5 rounded-md">
+                <span className={`text-2xl font-extrabold tracking-tight ${theme === "light" ? "text-slate-900" : "text-slate-100"}`}>{selectedSymbol}</span>
+                <span className="text-[10px] uppercase text-indigo-500 font-mono tracking-wider font-bold bg-indigo-500/10 px-2 py-0.5 rounded-md">
                   {quotes[selectedSymbol]?.name ? "Active Quote" : "Selected"}
                 </span>
               </div>
-              <span className="text-xs text-slate-400 font-medium mt-1 truncate">
+              <span className={`text-xs font-medium mt-1 truncate ${theme === "light" ? "text-slate-500" : "text-slate-400"}`}>
                 {quotes[selectedSymbol]?.name || "Loading metadata..."}
                 {quotes[selectedSymbol]?.sector && ` • ${quotes[selectedSymbol].sector}`}
               </span>
@@ -2045,14 +2235,18 @@ export default function Home() {
             {/* Price Chart Panel */}
             <div className="flex flex-col gap-4">
               <div className="flex justify-between items-center">
-                <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Historical Trend</span>
-                <div className="flex bg-[#070b16] rounded-lg p-0.5 border border-slate-800/80">
+                <span className={`text-xs font-semibold uppercase tracking-wider ${theme === "light" ? "text-slate-500" : "text-slate-400"}`}>Historical Trend</span>
+                <div className={`flex rounded-lg p-0.5 border ${
+                  theme === "light" ? "bg-slate-100 border-slate-200" : "bg-[#070b16] border-slate-800/80"
+                }`}>
                   {(["1D", "1W", "1M", "1Y"] as const).map((r) => (
                     <button
                       key={r}
                       onClick={() => setChartRange(r)}
                       className={`px-3 py-1 text-[10px] font-bold rounded-md transition ${chartRange === r
                         ? "bg-indigo-600 text-white shadow-md"
+                        : theme === "light"
+                        ? "text-slate-600 hover:text-slate-900"
                         : "text-slate-400 hover:text-slate-200"
                         }`}
                     >
@@ -2063,7 +2257,9 @@ export default function Home() {
               </div>
 
               {/* Render Interactive SVG Chart */}
-              <div className="bg-[#070b16]/40 border border-slate-800/50 rounded-2xl p-4 shadow-inner">
+              <div className={`border rounded-2xl p-4 ${
+                theme === "light" ? "bg-slate-50/80 border-slate-200/90 shadow-inner" : "bg-[#070b16]/40 border-slate-800/50 shadow-inner"
+              }`}>
                 {renderChart()}
               </div>
             </div>
@@ -2071,57 +2267,57 @@ export default function Home() {
             {/* Market Stats Grid */}
             {quotes[selectedSymbol] ? (
               <div className="flex flex-col gap-3">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Market Statistics</h3>
+                <h3 className={`text-xs font-bold uppercase tracking-wider ${theme === "light" ? "text-slate-500" : "text-slate-500"}`}>Market Statistics</h3>
 
                 <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-xs font-mono">
-                  <div className="flex justify-between border-b border-slate-800/30 pb-1.5">
+                  <div className={`flex justify-between border-b pb-1.5 ${theme === "light" ? "border-slate-200/70" : "border-slate-800/30"}`}>
                     <span className="text-slate-500">Market Cap</span>
-                    <span className="font-bold text-slate-350">
+                    <span className={`font-bold ${theme === "light" ? "text-slate-800" : "text-slate-350"}`}>
                       {formatNumber(quotes[selectedSymbol].marketCap)}
                     </span>
                   </div>
-                  <div className="flex justify-between border-b border-slate-800/30 pb-1.5">
+                  <div className={`flex justify-between border-b pb-1.5 ${theme === "light" ? "border-slate-200/70" : "border-slate-800/30"}`}>
                     <span className="text-slate-500">Day Volume</span>
-                    <span className="font-bold text-slate-350">
+                    <span className={`font-bold ${theme === "light" ? "text-slate-800" : "text-slate-350"}`}>
                       {formatNumber(quotes[selectedSymbol].volume)}
                     </span>
                   </div>
-                  <div className="flex justify-between border-b border-slate-800/30 pb-1.5">
+                  <div className={`flex justify-between border-b pb-1.5 ${theme === "light" ? "border-slate-200/70" : "border-slate-800/30"}`}>
                     <span className="text-slate-500">Open Price</span>
-                    <span className="font-bold text-slate-350">
+                    <span className={`font-bold ${theme === "light" ? "text-slate-800" : "text-slate-350"}`}>
                       {formatCurrency(quotes[selectedSymbol].open)}
                     </span>
                   </div>
-                  <div className="flex justify-between border-b border-slate-800/30 pb-1.5">
+                  <div className={`flex justify-between border-b pb-1.5 ${theme === "light" ? "border-slate-200/70" : "border-slate-800/30"}`}>
                     <span className="text-slate-500">Prev Close</span>
-                    <span className="font-bold text-slate-350">
+                    <span className={`font-bold ${theme === "light" ? "text-slate-800" : "text-slate-350"}`}>
                       {formatCurrency(quotes[selectedSymbol].previousClose)}
                     </span>
                   </div>
-                  <div className="flex justify-between border-b border-slate-800/30 pb-1.5">
+                  <div className={`flex justify-between border-b pb-1.5 ${theme === "light" ? "border-slate-200/70" : "border-slate-800/30"}`}>
                     <span className="text-slate-500">PE Ratio</span>
-                    <span className="font-bold text-slate-350">
+                    <span className={`font-bold ${theme === "light" ? "text-slate-800" : "text-slate-350"}`}>
                       {quotes[selectedSymbol].pe ?? "N/A"}
                     </span>
                   </div>
-                  <div className="flex justify-between border-b border-slate-800/30 pb-1.5">
+                  <div className={`flex justify-between border-b pb-1.5 ${theme === "light" ? "border-slate-200/70" : "border-slate-800/30"}`}>
                     <span className="text-slate-500">Day Range</span>
-                    <span className="font-bold text-slate-355">
+                    <span className={`font-bold ${theme === "light" ? "text-slate-800" : "text-slate-350"}`}>
                       {formatCurrency(quotes[selectedSymbol].low)} - {formatCurrency(quotes[selectedSymbol].high)}
                     </span>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="text-xs text-slate-500 italic text-center py-4">
+              <div className="text-xs text-slate-400 italic text-center py-4">
                 Loading market statistics...
               </div>
             )}
 
             {/* Stock Notes / Comments Section */}
-            <div className="flex flex-col gap-3.5 border-t border-slate-800/60 pt-4">
+            <div className={`flex flex-col gap-3.5 border-t pt-4 ${theme === "light" ? "border-slate-200" : "border-slate-800/60"}`}>
               <div className="flex justify-between items-center">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <h3 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${theme === "light" ? "text-slate-600" : "text-slate-500"}`}>
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
                   </svg>
@@ -2130,10 +2326,10 @@ export default function Home() {
                 {commentStatus && (
                   <span
                     className={`text-[10px] font-bold font-mono transition-opacity duration-300 ${commentStatus === "Saving..."
-                      ? "text-amber-400 animate-pulse"
+                      ? "text-amber-500 animate-pulse"
                       : commentStatus === "Saved"
-                        ? "text-emerald-400"
-                        : "text-rose-400"
+                        ? "text-emerald-500"
+                        : "text-rose-500"
                       }`}
                   >
                     {commentStatus}
@@ -2148,7 +2344,11 @@ export default function Home() {
                   onChange={(e) => setNewCommentText(e.target.value)}
                   placeholder="Type a new comment or research note..."
                   rows={2}
-                  className="w-full bg-[#070b16]/65 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-xs py-2 px-3 rounded-xl text-slate-200 placeholder-slate-600 outline-none transition resize-none leading-relaxed"
+                  className={`w-full border focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-xs py-2 px-3 rounded-xl outline-none transition resize-none leading-relaxed ${
+                    theme === "light"
+                      ? "bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400 focus:bg-white"
+                      : "bg-[#070b16]/65 border-slate-800 text-slate-200 placeholder-slate-600"
+                  }`}
                 />
                 <button
                   type="submit"
@@ -2168,12 +2368,18 @@ export default function Home() {
                   {notes[selectedSymbol].map((comment) => (
                     <div
                       key={comment.id}
-                      className="relative group/comment bg-[#070b16]/30 border border-slate-850 rounded-xl p-3.5 flex flex-col gap-1.5 transition hover:border-slate-800/80"
+                      className={`relative group/comment border rounded-xl p-3.5 flex flex-col gap-1.5 transition ${
+                        theme === "light"
+                          ? "bg-slate-50 border-slate-200/90 text-slate-800 hover:border-slate-300"
+                          : "bg-[#070b16]/30 border-slate-850 text-slate-200 hover:border-slate-800/80"
+                      }`}
                     >
-                      <p className="text-xs text-slate-200 whitespace-pre-wrap leading-relaxed">
+                      <p className={`text-xs whitespace-pre-wrap leading-relaxed ${theme === "light" ? "text-slate-800" : "text-slate-200"}`}>
                         {comment.text}
                       </p>
-                      <div className="flex justify-between items-center text-[10px] text-slate-500 font-mono">
+                      <div className={`flex justify-between items-center text-[10px] font-mono ${
+                        theme === "light" ? "text-slate-400" : "text-slate-500"
+                      }`}>
                         <span>
                           {new Date(comment.createdAt).toLocaleString("en-US", {
                             month: "short",
@@ -2185,7 +2391,7 @@ export default function Home() {
                         </span>
                         <button
                           onClick={() => handleDeleteComment(comment.id)}
-                          className="text-rose-400/70 hover:text-rose-400 transition-colors p-1 rounded hover:bg-rose-500/10 cursor-pointer"
+                          className="text-rose-400/70 hover:text-rose-500 transition-colors p-1 rounded hover:bg-rose-500/10 cursor-pointer"
                           title="Delete comment"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -2197,8 +2403,8 @@ export default function Home() {
                   ))}
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center py-6 border border-dashed border-slate-850 rounded-xl bg-[#070b16]/10 text-slate-500 text-xs italic">
-                  No comments added yet. Start tracking your research for this asset above.
+                <div className={`text-xs italic text-center py-2 ${theme === "light" ? "text-slate-400" : "text-slate-500"}`}>
+                  No comments yet for {selectedSymbol}.
                 </div>
               )}
             </div>
