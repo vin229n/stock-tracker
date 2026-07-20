@@ -130,6 +130,7 @@ export default function Home() {
 
   // Search input state
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterQuery, setFilterQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [addingTicker, setAddingTicker] = useState(false);
@@ -682,11 +683,22 @@ export default function Home() {
   }, [trackedStocks, sortField, sortDirection, getPercentDistance, quotes]);
 
   const displayedStocks = React.useMemo(() => {
+    const query = filterQuery.trim().toLowerCase();
     return sortedStocks.filter((s) => {
       const isIndian = s.symbol.endsWith(".NS") || s.symbol.endsWith(".BO");
-      return activeTab === "IN" ? isIndian : !isIndian;
+      const matchesTab = activeTab === "IN" ? isIndian : !isIndian;
+      if (!matchesTab) return false;
+
+      if (!query) return true;
+
+      const quote = quotes[s.symbol];
+      const symbolMatches = s.symbol.toLowerCase().includes(query);
+      const nameMatches = quote?.name?.toLowerCase().includes(query) ?? false;
+      const sectorMatches = quote?.sector?.toLowerCase().includes(query) ?? false;
+
+      return symbolMatches || nameMatches || sectorMatches;
     });
-  }, [sortedStocks, activeTab]);
+  }, [sortedStocks, activeTab, filterQuery, quotes]);
 
   const activeSuggestedTickers = React.useMemo(() => {
     return activeTab === "IN" ? INDIAN_SUGGESTED_TICKERS : SUGGESTED_TICKERS;
@@ -1234,26 +1246,56 @@ export default function Home() {
                   </span>
                 </div>
 
-                {/* Tabs Switcher */}
-                <div className="flex w-full sm:w-auto bg-[#070b16] rounded-xl p-1 border border-slate-800/80 shadow-inner">
-                  <button
-                    onClick={() => handleTabChange("US")}
-                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${activeTab === "US"
-                      ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md"
-                      : "text-slate-400 hover:text-slate-200"
-                      }`}
-                  >
-                    <span>🇺🇸</span> US Stocks
-                  </button>
-                  <button
-                    onClick={() => handleTabChange("IN")}
-                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${activeTab === "IN"
-                      ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md"
-                      : "text-slate-400 hover:text-slate-200"
-                      }`}
-                  >
-                    <span>🇮🇳</span> Indian Stocks
-                  </button>
+                {/* Filter & Tabs Controls */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
+                  {/* Search Watchlist Input */}
+                  <div className="relative flex-1 sm:w-64">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                      </svg>
+                    </div>
+                    <input
+                      type="text"
+                      value={filterQuery}
+                      onChange={(e) => setFilterQuery(e.target.value)}
+                      placeholder="Filter ticker or name..."
+                      className="w-full pl-9 pr-8 py-1.5 bg-[#070b16] border border-slate-800/80 hover:border-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl text-xs text-slate-200 placeholder-slate-500 outline-none transition-all shadow-inner"
+                    />
+                    {filterQuery && (
+                      <button
+                        onClick={() => setFilterQuery("")}
+                        className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-500 hover:text-slate-300"
+                        title="Clear search"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Tabs Switcher */}
+                  <div className="flex w-full sm:w-auto bg-[#070b16] rounded-xl p-1 border border-slate-800/80 shadow-inner">
+                    <button
+                      onClick={() => handleTabChange("US")}
+                      className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${activeTab === "US"
+                        ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md"
+                        : "text-slate-400 hover:text-slate-200"
+                        }`}
+                    >
+                      <span>🇺🇸</span> US Stocks
+                    </button>
+                    <button
+                      onClick={() => handleTabChange("IN")}
+                      className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${activeTab === "IN"
+                        ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md"
+                        : "text-slate-400 hover:text-slate-200"
+                        }`}
+                    >
+                      <span>🇮🇳</span> Indian Stocks
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -1266,7 +1308,25 @@ export default function Home() {
                   <p className="text-xs">Fetching live quotes from Yahoo Finance...</p>
                 </div>
               ) : displayedStocks.length === 0 ? (
-                activeTab === "IN" ? (
+                filterQuery.trim() ? (
+                  <div className="py-12 text-center border border-dashed border-slate-800/80 rounded-2xl px-6 bg-slate-950/20 max-w-md mx-auto my-4 flex flex-col items-center">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/15 flex items-center justify-center mb-3 text-slate-400">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                      </svg>
+                    </div>
+                    <p className="text-slate-200 text-sm font-semibold mb-1">No stocks matching &quot;{filterQuery}&quot;</p>
+                    <p className="text-slate-400 text-xs mb-4 text-center max-w-xs leading-relaxed">
+                      Try searching by a different ticker symbol or company name.
+                    </p>
+                    <button
+                      onClick={() => setFilterQuery("")}
+                      className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition shadow"
+                    >
+                      Clear Filter
+                    </button>
+                  </div>
+                ) : activeTab === "IN" ? (
                   <div className="py-12 text-center border border-dashed border-slate-800/80 rounded-2xl px-6 bg-slate-950/20 max-w-md mx-auto my-4 flex flex-col items-center">
                     <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/15 flex items-center justify-center mb-4 text-xl">
                       🇮🇳
@@ -1545,6 +1605,72 @@ export default function Home() {
 
                   {/* Mobile watchlist card stack (visible only on mobile) */}
                   <div className="md:hidden flex flex-col gap-3">
+                    {/* Mobile Sort Control Bar */}
+                    <div className="flex items-center justify-between bg-slate-900/40 px-3 py-2 rounded-xl border border-slate-800/60 mb-0.5 text-xs">
+                      <span className="text-slate-400 font-medium">Sort Watchlist:</span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => {
+                            if (sortField !== "distance") {
+                              setSortField("distance");
+                              setSortDirection("asc");
+                            } else if (sortDirection === "asc") {
+                              setSortDirection("desc");
+                            } else {
+                              setSortField(null);
+                              setSortDirection(null);
+                            }
+                          }}
+                          className={`px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 transition-all ${
+                            sortField === "distance"
+                              ? "bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 shadow-sm"
+                              : "bg-slate-800/60 text-slate-400 hover:text-slate-200 border border-slate-700/40"
+                          }`}
+                        >
+                          <span>Distance</span>
+                          {sortField === "distance" ? (
+                            <span className="text-indigo-400 font-bold">
+                              {sortDirection === "asc" ? "↑" : "↓"}
+                            </span>
+                          ) : (
+                            <svg className="w-3 h-3 opacity-40" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
+                            </svg>
+                          )}
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            if (sortField !== "sector") {
+                              setSortField("sector");
+                              setSortDirection("asc");
+                            } else if (sortDirection === "asc") {
+                              setSortDirection("desc");
+                            } else {
+                              setSortField(null);
+                              setSortDirection(null);
+                            }
+                          }}
+                          className={`px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 transition-all ${
+                            sortField === "sector"
+                              ? "bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 shadow-sm"
+                              : "bg-slate-800/60 text-slate-400 hover:text-slate-200 border border-slate-700/40"
+                          }`}
+                        >
+                          <span>Sector</span>
+                          {sortField === "sector" ? (
+                            <span className="text-indigo-400 font-bold">
+                              {sortDirection === "asc" ? "A-Z" : "Z-A"}
+                            </span>
+                          ) : (
+                            <svg className="w-3 h-3 opacity-40" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
                     {displayedStocks.map((stock) => {
                       const quote = quotes[stock.symbol];
                       const flash = priceFlash[stock.symbol];
@@ -1628,9 +1754,34 @@ export default function Home() {
                               )}
                             </div>
 
-                            {/* Distance (%) */}
-                            <div className="flex flex-col items-center">
-                              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-0.5">Distance</span>
+                            {/* Distance (%) - Tapping toggles sorting */}
+                            <div
+                              className="flex flex-col items-center cursor-pointer select-none group/dist"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (sortField !== "distance") {
+                                  setSortField("distance");
+                                  setSortDirection("asc");
+                                } else if (sortDirection === "asc") {
+                                  setSortDirection("desc");
+                                } else {
+                                  setSortField(null);
+                                  setSortDirection(null);
+                                }
+                              }}
+                            >
+                              <span className="text-[10px] uppercase font-bold text-slate-500 group-hover/dist:text-indigo-400 tracking-wider mb-0.5 flex items-center gap-0.5">
+                                Distance
+                                {sortField === "distance" ? (
+                                  <span className="text-indigo-400 font-extrabold">
+                                    {sortDirection === "asc" ? "↑" : "↓"}
+                                  </span>
+                                ) : (
+                                  <svg className="w-2.5 h-2.5 opacity-40 group-hover/dist:opacity-100" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
+                                  </svg>
+                                )}
+                              </span>
                               {quote && entry > 0 ? (
                                 <div className="flex flex-col items-center">
                                   <span className={`font-mono font-bold text-xs ${isTriggered ? "text-emerald-400" : "text-slate-300"}`}>
