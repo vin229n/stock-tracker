@@ -110,6 +110,35 @@ const getTradingViewUrl = (symbol: string): string => {
   return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(s)}`;
 };
 
+const UsFlag = ({ className = "w-4 h-3 rounded-[2px] shadow-sm inline-block shrink-0" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 741 390">
+    <path fill="#b22234" d="M0 0h741v390H0z" />
+    <path fill="#fff" d="M0 30h741v30H0zm0 60h741v30H0zm0 60h741v30H0zm0 60h741v30H0zm0 60h741v30H0zm0 60h741v30H0z" />
+    <path fill="#3c3b6e" d="M0 0h296.4v210H0z" />
+    <g fill="#fff">
+      <circle cx="25" cy="20" r="5" /><circle cx="75" cy="20" r="5" /><circle cx="125" cy="20" r="5" /><circle cx="175" cy="20" r="5" /><circle cx="225" cy="20" r="5" /><circle cx="275" cy="20" r="5" />
+      <circle cx="50" cy="40" r="5" /><circle cx="100" cy="40" r="5" /><circle cx="150" cy="40" r="5" /><circle cx="200" cy="40" r="5" /><circle cx="250" cy="40" r="5" />
+      <circle cx="25" cy="60" r="5" /><circle cx="75" cy="60" r="5" /><circle cx="125" cy="60" r="5" /><circle cx="175" cy="60" r="5" /><circle cx="225" cy="60" r="5" /><circle cx="275" cy="60" r="5" />
+      <circle cx="50" cy="80" r="5" /><circle cx="100" cy="80" r="5" /><circle cx="150" cy="80" r="5" /><circle cx="200" cy="80" r="5" /><circle cx="250" cy="80" r="5" />
+      <circle cx="25" cy="100" r="5" /><circle cx="75" cy="100" r="5" /><circle cx="125" cy="100" r="5" /><circle cx="175" cy="100" r="5" /><circle cx="225" cy="100" r="5" /><circle cx="275" cy="100" r="5" />
+      <circle cx="50" cy="120" r="5" /><circle cx="100" cy="120" r="5" /><circle cx="150" cy="120" r="5" /><circle cx="200" cy="120" r="5" /><circle cx="250" cy="120" r="5" />
+      <circle cx="25" cy="140" r="5" /><circle cx="75" cy="140" r="5" /><circle cx="125" cy="140" r="5" /><circle cx="175" cy="140" r="5" /><circle cx="225" cy="140" r="5" /><circle cx="275" cy="140" r="5" />
+      <circle cx="50" cy="160" r="5" /><circle cx="100" cy="160" r="5" /><circle cx="150" cy="160" r="5" /><circle cx="200" cy="160" r="5" /><circle cx="250" cy="160" r="5" />
+      <circle cx="25" cy="180" r="5" /><circle cx="75" cy="180" r="5" /><circle cx="125" cy="180" r="5" /><circle cx="175" cy="180" r="5" /><circle cx="225" cy="180" r="5" /><circle cx="275" cy="180" r="5" />
+    </g>
+  </svg>
+);
+
+const IndiaFlag = ({ className = "w-4 h-3 rounded-[2px] shadow-sm inline-block shrink-0" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 640 426">
+    <path fill="#FF9933" d="M0 0h640v142H0z" />
+    <path fill="#FFFFFF" d="M0 142h640v142H0z" />
+    <path fill="#138808" d="M0 284h640v142H0z" />
+    <circle cx="320" cy="213" r="45" fill="none" stroke="#000080" strokeWidth="8" />
+    <circle cx="320" cy="213" r="8" fill="#000080" />
+  </svg>
+);
+
 export default function Home() {
   const [mounted, setMounted] = useState(false);
   const [trackedStocks, setTrackedStocks] = useState<TrackedStock[]>([]);
@@ -276,41 +305,68 @@ export default function Home() {
 
     try {
       const symbols = symbolsToFetch.join(",");
-      const response = await fetch(`/api/stock?symbols=${symbols}`);
+      const response = await fetch(`/api/stock?symbols=${symbols}&stream=true`);
       if (!response.ok) throw new Error("Failed to fetch quotes");
 
-      const data = await response.json();
-      const newQuotes: Record<string, StockQuote> = {};
-      const flashUpdates: Record<string, "up" | "down" | null> = {};
+      if (response.body) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
 
-      data.quotes.forEach((quote: StockQuote) => {
-        newQuotes[quote.symbol] = quote;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (value) {
+            buffer += decoder.decode(value, { stream: !done });
+            const lines = buffer.split("\n");
+            // The last element in lines might be an incomplete chunk, keep it in buffer
+            buffer = lines.pop() || "";
 
-        // Determine if price changed since last update for flash animation
-        const prevQuote = quotesRef.current[quote.symbol];
-        if (prevQuote && prevQuote.price !== quote.price) {
-          flashUpdates[quote.symbol] = quote.price > prevQuote.price ? "up" : "down";
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed) continue;
+              try {
+                const quote: StockQuote = JSON.parse(trimmed);
+                if (quote && quote.symbol) {
+                  // Determine price flash animation
+                  const prevQuote = quotesRef.current[quote.symbol];
+                  if (prevQuote && prevQuote.price !== quote.price) {
+                    const direction = quote.price > prevQuote.price ? "up" : "down";
+                    setPriceFlash((prev) => ({ ...prev, [quote.symbol]: direction }));
+                    setTimeout(() => {
+                      setPriceFlash((prev) => ({ ...prev, [quote.symbol]: null }));
+                    }, 1000);
+                  }
+
+                  // Update quotes state immediately per individual stock
+                  setQuotes((prev) => ({ ...prev, [quote.symbol]: quote }));
+                  setLastUpdated(new Date());
+                  // Unblock main screen loading as soon as first quote streams in
+                  setLoading(false);
+                }
+              } catch (e) {
+                console.error("Error parsing streaming quote line:", e, trimmed);
+              }
+            }
+          }
+          if (done) break;
         }
-      });
 
-      setQuotes((prev) => ({ ...prev, ...newQuotes }));
-      setLastUpdated(new Date());
-
-      // Trigger flash animations and clear them after 1 second
-      if (Object.keys(flashUpdates).length > 0) {
-        setPriceFlash((prev) => ({ ...prev, ...flashUpdates }));
-        setTimeout(() => {
-          setPriceFlash((prev) => {
-            const cleared = { ...prev };
-            Object.keys(flashUpdates).forEach((sym) => {
-              cleared[sym] = null;
-            });
-            return cleared;
-          });
-        }, 1000);
+        // Parse any remaining buffer line
+        if (buffer.trim()) {
+          try {
+            const quote: StockQuote = JSON.parse(buffer.trim());
+            if (quote && quote.symbol) {
+              setQuotes((prev) => ({ ...prev, [quote.symbol]: quote }));
+              setLastUpdated(new Date());
+              setLoading(false);
+            }
+          } catch (e) {
+            // ignore partial line error
+          }
+        }
       }
     } catch (error) {
-      console.error("Error fetching quotes:", error);
+      console.error("Error fetching quotes stream:", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -409,7 +465,7 @@ export default function Home() {
   useEffect(() => {
     if (!mounted) return;
     const symbolsList = trackedSymbolsString ? trackedSymbolsString.split(",") : [];
-    
+
     const timer = setTimeout(() => {
       fetchQuotes(symbolsList);
     }, 0);
@@ -1279,21 +1335,21 @@ export default function Home() {
                   <div className="flex w-full sm:w-auto bg-[#070b16] rounded-xl p-1 border border-slate-800/80 shadow-inner">
                     <button
                       onClick={() => handleTabChange("US")}
-                      className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${activeTab === "US"
+                      className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${activeTab === "US"
                         ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md"
                         : "text-slate-400 hover:text-slate-200"
                         }`}
                     >
-                      <span>🇺🇸</span> US Stocks
+                      <UsFlag className="w-4 h-3 rounded-[2px] shadow-sm inline-block" /> US Stocks
                     </button>
                     <button
                       onClick={() => handleTabChange("IN")}
-                      className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${activeTab === "IN"
+                      className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${activeTab === "IN"
                         ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md"
                         : "text-slate-400 hover:text-slate-200"
                         }`}
                     >
-                      <span>🇮🇳</span> Indian Stocks
+                      <IndiaFlag className="w-4 h-3 rounded-[2px] shadow-sm inline-block" /> Indian Stocks
                     </button>
                   </div>
                 </div>
@@ -1329,7 +1385,7 @@ export default function Home() {
                 ) : activeTab === "IN" ? (
                   <div className="py-12 text-center border border-dashed border-slate-800/80 rounded-2xl px-6 bg-slate-950/20 max-w-md mx-auto my-4 flex flex-col items-center">
                     <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/15 flex items-center justify-center mb-4 text-xl">
-                      🇮🇳
+                      <IndiaFlag className="w-7 h-5 rounded shadow-sm" />
                     </div>
                     <h3 className="text-slate-200 text-sm font-semibold mb-1">No Indian stocks tracked yet</h3>
                     <p className="text-slate-400 text-xs mb-6 text-center max-w-xs leading-relaxed">
@@ -1346,12 +1402,14 @@ export default function Home() {
                     </button>
                   </div>
                 ) : (
-                  <div className="py-12 text-center border-2 border-dashed border-slate-800 rounded-xl px-4">
-                    <svg className="h-10 w-10 text-slate-600 mx-auto mb-3" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75c.621 0 1.125.504 1.125 1.125v1.875c0 .621-.504 1.125-1.125 1.125H5.625a1.125 1.125 0 01-1.125-1.125V5.625c0-.621.504-1.125 1.125-1.125z" />
-                    </svg>
-                    <p className="text-slate-400 text-sm font-medium">Your US watchlist is empty.</p>
-                    <p className="text-slate-500 text-xs mt-1">Search for a US ticker symbol above to start tracking portfolio performance.</p>
+                  <div className="py-12 text-center border border-dashed border-slate-800/80 rounded-2xl px-6 bg-slate-950/20 max-w-md mx-auto my-4 flex flex-col items-center">
+                    <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/15 flex items-center justify-center mb-4 text-xl">
+                      <UsFlag className="w-7 h-5 rounded shadow-sm" />
+                    </div>
+                    <h3 className="text-slate-200 text-sm font-semibold mb-1">Your US watchlist is empty</h3>
+                    <p className="text-slate-400 text-xs text-center max-w-xs leading-relaxed">
+                      Search for a US ticker symbol above to start tracking portfolio performance.
+                    </p>
                   </div>
                 )
               ) : (
@@ -1621,11 +1679,10 @@ export default function Home() {
                               setSortDirection(null);
                             }
                           }}
-                          className={`px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 transition-all ${
-                            sortField === "distance"
-                              ? "bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 shadow-sm"
-                              : "bg-slate-800/60 text-slate-400 hover:text-slate-200 border border-slate-700/40"
-                          }`}
+                          className={`px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 transition-all ${sortField === "distance"
+                            ? "bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 shadow-sm"
+                            : "bg-slate-800/60 text-slate-400 hover:text-slate-200 border border-slate-700/40"
+                            }`}
                         >
                           <span>Distance</span>
                           {sortField === "distance" ? (
@@ -1651,11 +1708,10 @@ export default function Home() {
                               setSortDirection(null);
                             }
                           }}
-                          className={`px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 transition-all ${
-                            sortField === "sector"
-                              ? "bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 shadow-sm"
-                              : "bg-slate-800/60 text-slate-400 hover:text-slate-200 border border-slate-700/40"
-                          }`}
+                          className={`px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 transition-all ${sortField === "sector"
+                            ? "bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 shadow-sm"
+                            : "bg-slate-800/60 text-slate-400 hover:text-slate-200 border border-slate-700/40"
+                            }`}
                         >
                           <span>Sector</span>
                           {sortField === "sector" ? (
@@ -2073,13 +2129,12 @@ export default function Home() {
                 </h3>
                 {commentStatus && (
                   <span
-                    className={`text-[10px] font-bold font-mono transition-opacity duration-300 ${
-                      commentStatus === "Saving..."
-                        ? "text-amber-400 animate-pulse"
-                        : commentStatus === "Saved"
+                    className={`text-[10px] font-bold font-mono transition-opacity duration-300 ${commentStatus === "Saving..."
+                      ? "text-amber-400 animate-pulse"
+                      : commentStatus === "Saved"
                         ? "text-emerald-400"
                         : "text-rose-400"
-                    }`}
+                      }`}
                   >
                     {commentStatus}
                   </span>

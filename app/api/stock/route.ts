@@ -110,174 +110,198 @@ export async function GET(request: NextRequest) {
       console.warn("FINNHUB_API_KEY is not set in environment variables.");
     }
 
-    const quotes = await Promise.all(
-      symbols.map(async (symbol) => {
-        try {
-          if (!apiKey) {
-            const basePrice = 150;
-            return {
-              symbol,
-              name: symbol,
-              price: basePrice,
-              change: 1.5,
-              changePercent: 1.0,
-              high: basePrice + 5,
-              low: basePrice - 2,
-              open: basePrice - 1,
-              previousClose: basePrice - 1.5,
-              volume: 1000000,
-              marketCap: basePrice * 50000000,
-              pe: getFallbackPe(symbol, basePrice),
-              currency: "USD",
-              sector: "Technology",
-            };
-          }
-
-          // 1. Fetch quote from Finnhub API
-          const quoteUrl = `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${apiKey}`;
-          const quoteRes = await fetch(quoteUrl, { next: { revalidate: 0 } });
-
-          if (!quoteRes.ok) {
-            console.error(`Finnhub quote API failed for ${symbol}: Status ${quoteRes.status}`);
-            return null;
-          }
-
-          const quoteData = await quoteRes.json();
-          const price = quoteData.c ?? 0;
-          const change = quoteData.d ?? 0;
-          const changePercent = quoteData.dp ?? 0;
-          const high = quoteData.h ?? price;
-          const low = quoteData.l ?? price;
-          const open = quoteData.o ?? price;
-          const previousClose = quoteData.pc ?? price;
-
-          if (price === 0 && previousClose === 0) {
-            console.error(`No valid price data returned from Finnhub for ${symbol}`);
-            return null;
-          }
-
-          // 2. Fetch or lookup company profile (sector, market cap, currency, name)
-          const sectorCache = readSectorCache();
-          const now = Date.now();
-          const SECTOR_CACHE_LIFETIME = 7 * 24 * 60 * 60 * 1000; // 7 days
-
-          let name = symbol;
-          let sector = "Other";
-          let currency = symbol.endsWith(".NS") || symbol.endsWith(".BO") ? "INR" : "USD";
-          let marketCap = 0;
-
-          if (sectorCache[symbol] && (now - sectorCache[symbol].fetchedAt < SECTOR_CACHE_LIFETIME)) {
-            const cached = sectorCache[symbol];
-            sector = cached.sector;
-            name = cached.name || symbol;
-            currency = cached.currency || currency;
-            marketCap = cached.marketCap || 0;
-          } else {
-            try {
-              const profileUrl = `https://finnhub.io/api/v1/stock/profile2?symbol=${encodeURIComponent(symbol)}&token=${apiKey}`;
-              const profileRes = await fetch(profileUrl, { next: { revalidate: 3600 } });
-
-              if (profileRes.ok) {
-                const profileData = await profileRes.json();
-                if (profileData && profileData.name) {
-                  name = profileData.name;
-                  sector = profileData.finnhubIndustry || sector;
-                  currency = profileData.currency || currency;
-                  
-                  if (profileData.marketCapitalization) {
-                    marketCap = profileData.marketCapitalization * 1000000;
-                  } else if (profileData.shareOutstanding) {
-                    marketCap = price * profileData.shareOutstanding * 1000000;
-                  }
-                }
-              }
-            } catch (e) {
-              console.error(`Failed to fetch Finnhub profile2 for ${symbol}:`, e);
-            }
-
-            if (marketCap === 0) {
-              let sharesOutstanding = 50000000;
-              if (symbol === "AAPL") sharesOutstanding = 15400000000;
-              else if (symbol === "MSFT") sharesOutstanding = 7430000000;
-              else if (symbol === "NVDA") sharesOutstanding = 24600000000;
-              else if (symbol === "TSLA") sharesOutstanding = 3180000000;
-              else if (symbol === "AMZN") sharesOutstanding = 10400000000;
-              else if (symbol === "GOOGL") sharesOutstanding = 12400000000;
-              else if (symbol === "META") sharesOutstanding = 2540000000;
-              marketCap = price * sharesOutstanding;
-            }
-
-            sectorCache[symbol] = {
-              sector,
-              name,
-              currency,
-              marketCap,
-              fetchedAt: now,
-            };
-            writeSectorCache(sectorCache);
-          }
-
-          // 3. P/E Ratio lookup (with caching)
-          let pe: number | string = "N/A";
-          const isCryptoOrIndex = symbol.endsWith("-USD") || symbol.startsWith("^");
-
-          const peCache = readCache();
-          const cachedPeEntry = peCache[symbol];
-          const PE_CACHE_LIFETIME = 24 * 60 * 60 * 1000; // 24 hours
-
-          if (!isCryptoOrIndex && cachedPeEntry && (now - cachedPeEntry.fetchedAt < PE_CACHE_LIFETIME)) {
-            pe = cachedPeEntry.pe;
-          } else if (!isCryptoOrIndex) {
-            let fetchedPe: number | null = null;
-            try {
-              const metricUrl = `https://finnhub.io/api/v1/stock/metric?symbol=${encodeURIComponent(symbol)}&metric=all&token=${apiKey}`;
-              const metricRes = await fetch(metricUrl, { next: { revalidate: 3600 } });
-              if (metricRes.ok) {
-                const metricData = await metricRes.json();
-                const rawPe = metricData.metric?.peTTM ?? metricData.metric?.peNormalizedAnnual;
-                if (typeof rawPe === "number" && !isNaN(rawPe) && rawPe > 0) {
-                  fetchedPe = Number(rawPe.toFixed(2));
-                }
-              }
-            } catch (e) {
-              console.error(`Failed to fetch Finnhub metric for ${symbol}:`, e);
-            }
-
-            if (fetchedPe !== null) {
-              pe = fetchedPe;
-            } else {
-              pe = getFallbackPe(symbol, price);
-            }
-
-            peCache[symbol] = { pe, fetchedAt: now };
-            writeCache(peCache);
-          }
-
+    const fetchQuoteForSymbol = async (symbol: string) => {
+      try {
+        if (!apiKey) {
+          const basePrice = 150;
           return {
             symbol,
-            name,
-            price: Number(price.toFixed(2)),
-            change: Number(change.toFixed(2)),
-            changePercent: Number(changePercent.toFixed(4)),
-            high: Number(high.toFixed(2)),
-            low: Number(low.toFixed(2)),
-            open: Number(open.toFixed(2)),
-            previousClose: Number(previousClose.toFixed(2)),
-            volume: 0,
-            marketCap,
-            pe,
-            currency,
-            sector,
+            name: symbol,
+            price: basePrice,
+            change: 1.5,
+            changePercent: 1.0,
+            high: basePrice + 5,
+            low: basePrice - 2,
+            open: basePrice - 1,
+            previousClose: basePrice - 1.5,
+            volume: 1000000,
+            marketCap: basePrice * 50000000,
+            pe: getFallbackPe(symbol, basePrice),
+            currency: "USD",
+            sector: "Technology",
           };
-        } catch (err) {
-          console.error(`Exception occurred while fetching ${symbol} quote from Finnhub:`, err);
+        }
+
+        // 1. Fetch quote from Finnhub API
+        const quoteUrl = `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${apiKey}`;
+        const quoteRes = await fetch(quoteUrl, { next: { revalidate: 0 } });
+
+        if (!quoteRes.ok) {
+          console.error(`Finnhub quote API failed for ${symbol}: Status ${quoteRes.status}`);
           return null;
         }
-      })
-    );
 
-    const validQuotes = quotes.filter((q) => q !== null);
-    return NextResponse.json({ quotes: validQuotes });
+        const quoteData = await quoteRes.json();
+        const price = quoteData.c ?? 0;
+        const change = quoteData.d ?? 0;
+        const changePercent = quoteData.dp ?? 0;
+        const high = quoteData.h ?? price;
+        const low = quoteData.l ?? price;
+        const open = quoteData.o ?? price;
+        const previousClose = quoteData.pc ?? price;
+
+        if (price === 0 && previousClose === 0) {
+          console.error(`No valid price data returned from Finnhub for ${symbol}`);
+          return null;
+        }
+
+        // 2. Fetch or lookup company profile (sector, market cap, currency, name)
+        const sectorCache = readSectorCache();
+        const now = Date.now();
+        const SECTOR_CACHE_LIFETIME = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+        let name = symbol;
+        let sector = "Other";
+        let currency = symbol.endsWith(".NS") || symbol.endsWith(".BO") ? "INR" : "USD";
+        let marketCap = 0;
+
+        if (sectorCache[symbol] && (now - sectorCache[symbol].fetchedAt < SECTOR_CACHE_LIFETIME)) {
+          const cached = sectorCache[symbol];
+          sector = cached.sector;
+          name = cached.name || symbol;
+          currency = cached.currency || currency;
+          marketCap = cached.marketCap || 0;
+        } else {
+          try {
+            const profileUrl = `https://finnhub.io/api/v1/stock/profile2?symbol=${encodeURIComponent(symbol)}&token=${apiKey}`;
+            const profileRes = await fetch(profileUrl, { next: { revalidate: 3600 } });
+
+            if (profileRes.ok) {
+              const profileData = await profileRes.json();
+              if (profileData && profileData.name) {
+                name = profileData.name;
+                sector = profileData.finnhubIndustry || sector;
+                currency = profileData.currency || currency;
+                
+                if (profileData.marketCapitalization) {
+                  marketCap = profileData.marketCapitalization * 1000000;
+                } else if (profileData.shareOutstanding) {
+                  marketCap = price * profileData.shareOutstanding * 1000000;
+                }
+              }
+            }
+          } catch (e) {
+            console.error(`Failed to fetch Finnhub profile2 for ${symbol}:`, e);
+          }
+
+          if (marketCap === 0) {
+            let sharesOutstanding = 50000000;
+            if (symbol === "AAPL") sharesOutstanding = 15400000000;
+            else if (symbol === "MSFT") sharesOutstanding = 7430000000;
+            else if (symbol === "NVDA") sharesOutstanding = 24600000000;
+            else if (symbol === "TSLA") sharesOutstanding = 3180000000;
+            else if (symbol === "AMZN") sharesOutstanding = 10400000000;
+            else if (symbol === "GOOGL") sharesOutstanding = 12400000000;
+            else if (symbol === "META") sharesOutstanding = 2540000000;
+            marketCap = price * sharesOutstanding;
+          }
+
+          sectorCache[symbol] = {
+            sector,
+            name,
+            currency,
+            marketCap,
+            fetchedAt: now,
+          };
+          writeSectorCache(sectorCache);
+        }
+
+        // 3. P/E Ratio lookup (with caching)
+        let pe: number | string = "N/A";
+        const isCryptoOrIndex = symbol.endsWith("-USD") || symbol.startsWith("^");
+
+        const peCache = readCache();
+        const cachedPeEntry = peCache[symbol];
+        const PE_CACHE_LIFETIME = 24 * 60 * 60 * 1000; // 24 hours
+
+        if (!isCryptoOrIndex && cachedPeEntry && (now - cachedPeEntry.fetchedAt < PE_CACHE_LIFETIME)) {
+          pe = cachedPeEntry.pe;
+        } else if (!isCryptoOrIndex) {
+          let fetchedPe: number | null = null;
+          try {
+            const metricUrl = `https://finnhub.io/api/v1/stock/metric?symbol=${encodeURIComponent(symbol)}&metric=all&token=${apiKey}`;
+            const metricRes = await fetch(metricUrl, { next: { revalidate: 3600 } });
+            if (metricRes.ok) {
+              const metricData = await metricRes.json();
+              const rawPe = metricData.metric?.peTTM ?? metricData.metric?.peNormalizedAnnual;
+              if (typeof rawPe === "number" && !isNaN(rawPe) && rawPe > 0) {
+                fetchedPe = Number(rawPe.toFixed(2));
+              }
+            }
+          } catch (e) {
+            console.error(`Failed to fetch Finnhub metric for ${symbol}:`, e);
+          }
+
+          if (fetchedPe !== null) {
+            pe = fetchedPe;
+          } else {
+            pe = getFallbackPe(symbol, price);
+          }
+
+          peCache[symbol] = { pe, fetchedAt: now };
+          writeCache(peCache);
+        }
+
+        return {
+          symbol,
+          name,
+          price: Number(price.toFixed(2)),
+          change: Number(change.toFixed(2)),
+          changePercent: Number(changePercent.toFixed(4)),
+          high: Number(high.toFixed(2)),
+          low: Number(low.toFixed(2)),
+          open: Number(open.toFixed(2)),
+          previousClose: Number(previousClose.toFixed(2)),
+          volume: 0,
+          marketCap,
+          pe,
+          currency,
+          sector,
+        };
+      } catch (err) {
+        console.error(`Exception occurred while fetching ${symbol} quote from Finnhub:`, err);
+        return null;
+      }
+    };
+
+    const streamParam = searchParams.get("stream");
+    if (streamParam !== "true") {
+      const quotes = await Promise.all(symbols.map(fetchQuoteForSymbol));
+      return NextResponse.json({ quotes: quotes.filter((q) => q !== null) });
+    }
+
+    // Streaming NDJSON response
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        const fetchPromises = symbols.map(async (symbol) => {
+          const quote = await fetchQuoteForSymbol(symbol);
+          if (quote) {
+            const chunk = encoder.encode(JSON.stringify(quote) + "\n");
+            controller.enqueue(chunk);
+          }
+        });
+        await Promise.all(fetchPromises);
+        controller.close();
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "application/x-ndjson; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+      },
+    });
   } catch (error: any) {
     console.error("Error in Finnhub quote proxy API:", error);
     return NextResponse.json(
