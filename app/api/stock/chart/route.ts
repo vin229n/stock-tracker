@@ -3,113 +3,125 @@ import { NextRequest, NextResponse } from "next/server";
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const symbol = searchParams.get("symbol");
+    const symbolParam = searchParams.get("symbol");
     const rangeParam = searchParams.get("range") || "1d";
 
-    if (!symbol) {
+    if (!symbolParam) {
       return NextResponse.json(
         { error: "Symbol query parameter is required." },
         { status: 400 }
       );
     }
 
-    // Map range to Yahoo Finance range and interval parameters
-    let range = "1d";
-    let interval = "5m";
+    const symbol = symbolParam.toUpperCase();
+    const apiKey = process.env.FINNHUB_API_KEY;
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    let fromSec = nowSec - 86400; // default 1 day back
+    let resolution = "5"; // default 5-minute interval
 
     switch (rangeParam.toLowerCase()) {
       case "1d":
-        range = "1d";
-        interval = "5m";
+        resolution = "5";
+        fromSec = nowSec - 24 * 3600;
         break;
       case "1w":
       case "5d":
-        range = "5d";
-        interval = "15m";
+        resolution = "15";
+        fromSec = nowSec - 7 * 24 * 3600;
         break;
       case "1m":
-        range = "1mo";
-        interval = "1d";
+        resolution = "D";
+        fromSec = nowSec - 30 * 24 * 3600;
         break;
       case "1y":
-        range = "1y";
-        interval = "1wk";
+        resolution = "W";
+        fromSec = nowSec - 365 * 24 * 3600;
         break;
       default:
-        range = "1d";
-        interval = "5m";
+        resolution = "5";
+        fromSec = nowSec - 24 * 3600;
     }
 
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
-      symbol.toUpperCase()
-    )}?range=${range}&interval=${interval}`;
+    if (!apiKey) {
+      console.warn("FINNHUB_API_KEY is missing. Returning simulated chart data.");
+      const points: { timestamp: number; price: number }[] = [];
+      const count = 20;
+      const basePrice = 150;
+      const step = (nowSec - fromSec) / count;
+      for (let i = 0; i < count; i++) {
+        const timeMs = (fromSec + i * step) * 1000;
+        const simulatedPrice = Number((basePrice + (Math.sin(i) * 3)).toFixed(2));
+        points.push({ timestamp: timeMs, price: simulatedPrice });
+      }
 
-    const response = await fetch(url, {
+      return NextResponse.json({
+        symbol,
+        currency: "USD",
+        regularMarketPrice: points[points.length - 1]?.price ?? basePrice,
+        previousClose: points[0]?.price ?? basePrice,
+        points,
+      });
+    }
+
+    const candleUrl = `https://finnhub.io/api/v1/stock/candle?symbol=${encodeURIComponent(
+      symbol
+    )}&resolution=${resolution}&from=${fromSec}&to=${nowSec}&token=${apiKey}`;
+
+    const response = await fetch(candleUrl, {
       method: "GET",
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        Accept: "application/json",
-      },
-      next: { revalidate: 60 }, // Cache chart responses for 1 minute
+      next: { revalidate: 60 },
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Yahoo Chart API error for ${symbol}:`, response.status, errorText);
+      console.error(`Finnhub candle API error for ${symbol}: Status ${response.status}`);
       return NextResponse.json(
-        { error: `Yahoo Chart API error: ${response.statusText}` },
+        { error: `Finnhub Chart API error: ${response.statusText}` },
         { status: response.status }
       );
     }
 
     const data = await response.json();
-    const result = data.chart?.result?.[0];
 
-    if (!result) {
-      return NextResponse.json(
-        { error: `No chart data found for symbol: ${symbol}` },
-        { status: 404 }
-      );
+    if (data.s !== "ok" || !Array.isArray(data.t) || data.t.length === 0) {
+      console.warn(`No candle data found for symbol: ${symbol} (status: ${data.s})`);
+      return NextResponse.json({
+        symbol,
+        currency: "USD",
+        regularMarketPrice: 0,
+        previousClose: 0,
+        points: [],
+      });
     }
 
-    const timestamps = result.timestamp || [];
-    const quotes = result.indicators?.quote?.[0] || {};
-    const closePrices = quotes.close || [];
-    const openPrices = quotes.open || [];
+    const points: { timestamp: number; price: number }[] = [];
+    const timestamps: number[] = data.t;
+    const closes: number[] = data.c;
 
-    // Construct valid chart data points (filtering out null/undefined prices or timestamps)
-    const points: { timestamp: number; price: number; open?: number }[] = [];
-    
     for (let i = 0; i < timestamps.length; i++) {
-      const timestamp = timestamps[i];
-      // Use close price, fall back to open price if close is null, or skip if both are invalid
-      const price = closePrices[i] !== null && closePrices[i] !== undefined
-        ? closePrices[i]
-        : (openPrices[i] !== null && openPrices[i] !== undefined ? openPrices[i] : null);
+      const ts = timestamps[i];
+      const closePrice = closes[i];
 
-      if (timestamp && price !== null && price !== undefined) {
+      if (ts && typeof closePrice === "number" && !isNaN(closePrice)) {
         points.push({
-          timestamp: timestamp * 1000, // Convert to milliseconds
-          price: Number(price.toFixed(2)),
+          timestamp: ts * 1000,
+          price: Number(closePrice.toFixed(2)),
         });
       }
     }
 
-    const meta = result.meta || {};
-    const currency = meta.currency || "USD";
-    const regularMarketPrice = meta.regularMarketPrice ?? 0;
-    const previousClose = meta.previousClose ?? 0;
+    const regularMarketPrice = points.length > 0 ? points[points.length - 1].price : 0;
+    const previousClose = points.length > 0 ? points[0].price : 0;
 
     return NextResponse.json({
-      symbol: symbol.toUpperCase(),
-      currency,
+      symbol,
+      currency: "USD",
       regularMarketPrice,
       previousClose,
       points,
     });
   } catch (error: any) {
-    console.error("Error in chart API proxy:", error);
+    console.error("Error in Finnhub chart API proxy:", error);
     return NextResponse.json(
       { error: "Internal server error: " + error.message },
       { status: 500 }

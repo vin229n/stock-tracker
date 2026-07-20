@@ -1,16 +1,52 @@
 {
   "TRENT.NS": "Other",
-  "TSLA": "Other",
-  "AMZN": "Other",
+  "TSLA": {
+    "sector": "Automobiles",
+    "name": "Tesla Inc",
+    "currency": "USD",
+    "marketCap": 1430329779390.2966,
+    "fetchedAt": 1784541508486
+  },
+  "AMZN": {
+    "sector": "Retail",
+    "name": "Amazon.com Inc",
+    "currency": "USD",
+    "marketCap": 2659480144285.3906,
+    "fetchedAt": 1784541543268
+  },
   "^DJI": "Index",
   "BTC-USD": "Cryptocurrency",
   "^IXIC": "Index",
   "^GSPC": "Index",
   "ETH-USD": "Cryptocurrency",
-  "NVDA": "Other",
-  "AAPL": "Other",
-  "MSFT": "Other",
-  "MU": "Other",
+  "NVDA": {
+    "sector": "Semiconductors",
+    "name": "NVIDIA Corp",
+    "currency": "USD",
+    "marketCap": 4908001855563.881,
+    "fetchedAt": 1784541514249
+  },
+  "AAPL": {
+    "sector": "Technology",
+    "name": "Apple Inc",
+    "currency": "USD",
+    "marketCap": 4901758483696.337,
+    "fetchedAt": 1784541538326
+  },
+  "MSFT": {
+    "sector": "Technology",
+    "name": "Microsoft Corp",
+    "currency": "USD",
+    "marketCap": 2925466146997.206,
+    "fetchedAt": 1784541538277
+  },
+  "MU": {
+    "sector": "Semiconductors",
+    "name": "Micron Technology Inc",
+    "currency": "USD",
+    "marketCap": 958798257443.1011,
+    "fetchedAt": 1784541543311
+  },
   "^NSEI": "Index",
   "^BSESN": "Index",
   "SBIN.BO": "Other",
@@ -19,7 +55,153 @@
   "TCS.BO": "Other",
   "INFY.NS": "Other",
   "ICICIBANK.NS": "Other",
-  "AVGO": "Other",
-  "ORCL": "Other",
-  "ATKR": "Other"
+  "AVGO": {
+    "sector": "Semiconductors",
+    "name": "Broadcom Inc",
+    "currency": "USD",
+    "marketCap": 1764229689984.57,
+    "fetchedAt": 1784541543238
+  },
+  "ORCL": {
+    "sector": "Technology",
+    "name": "Oracle Corp",
+    "currency": "USD",
+    "marketCap": 364120329760.2804,
+    "fetchedAt": 1784541543273
+  },
+  "ATKR": {
+    "sector": "Electrical Equipment",
+    "name": "Atkore Inc",
+    "currency": "USD",
+    "marketCap": 2479192712.9767504,
+    "fetchedAt": 1784541543229
+  },
+  "SBICARD.NS": "Other",
+  "PERSISTENT.NS": "Other",
+  "MRVL": {
+    "sector": "Semiconductors",
+    "name": "Marvell Technology Inc",
+    "currency": "USD",
+    "marketCap": 165239610512.40698,
+    "fetchedAt": 1784541543247
+  },
+  "LLY": {
+    "sector": "Pharmaceuticals",
+    "name": "Eli Lilly and Co",
+    "currency": "USD",
+    "marketCap": 1110416736866.6304,
+    "fetchedAt": 1784541573243
+  },
+  "INTU": {
+    "sector": "Technology",
+    "name": "Intuit Inc",
+    "currency": "USD",
+    "marketCap": 79623883942.63458,
+    "fetchedAt": 1784541572886
+  },
+  "TTD": {
+    "sector": "Media",
+    "name": "Trade Desk Inc",
+    "currency": "USD",
+    "marketCap": 8739321587.634413,
+    "fetchedAt": 1784541514267
+  },
+  "LULU": {
+    "sector": "Textiles, Apparel & Luxury Goods",
+    "name": "Lululemon Athletica Inc",
+    "currency": "USD",
+    "marketCap": 13804875405.421753,
+    "fetchedAt": 1784541543455
+  },
+  "SPCX": {
+    "sector": "Telecommunication",
+    "name": "Space Exploration Technologies Corp",
+    "currency": "USD",
+    "marketCap": 1644991010323.3352,
+    "fetchedAt": 1784541543289
+  },
+  "INTC": {
+    "sector": "Semiconductors",
+    "name": "Intel Corp",
+    "currency": "USD",
+    "marketCap": 477671056534.49036,
+    "fetchedAt": 1784541543405
+  },
+  "HOOD": {
+    "sector": "Financial Services",
+    "name": "Robinhood Markets Inc",
+    "currency": "USD",
+    "marketCap": 90094476172.9134,
+    "fetchedAt": 1784541573255
+  },
+  "MA": {
+    "sector": "Financial Services",
+    "name": "Mastercard Inc",
+    "currency": "USD",
+    "marketCap": 480316177969.2237,
+    "fetchedAt": 1784541543451
+  },
+  "RBRK": {
+    "sector": "Technology",
+    "name": "Rubrik Inc",
+    "currency": "USD",
+    "marketCap": 16254257934.393137,
+    "fetchedAt": 1784541543399
+  },
+  "IREN": {
+    "sector": "Technology",
+    "name": "IREN Ltd",
+    "currency": "USD",
+    "marketCap": 11997549273.553257,
+    "fetchedAt": 1784541543316
+  },
+  "GOOGL": {
+    "sector": "Media",
+    "name": "Alphabet Inc",
+    "currency": "USD",
+    "marketCap": 4221772171199.9995,
+    "fetchedAt": 1784541543435
+  },
+  "NFLX": {
+    "sector": "Media",
+    "name": "Netflix Inc",
+    "currency": "USD",
+    "marketCap": 290334539573.5158,
+    "fetchedAt": 1784541573161
+  },
+  "AMD": {
+    "sector": "Semiconductors",
+    "name": "Advanced Micro Devices Inc",
+    "currency": "USD",
+    "marketCap": 808386550423.6833,
+    "fetchedAt": 1784541573138
+  },
+  "UBER": {
+    "sector": "Road & Rail",
+    "name": "Uber Technologies Inc",
+    "currency": "USD",
+    "marketCap": 147499505292.78036,
+    "fetchedAt": 1784541543336
+  },
+  "ADBE": {
+    "sector": "Technology",
+    "name": "Adobe Inc",
+    "currency": "USD",
+    "marketCap": 94306874022.00288,
+    "fetchedAt": 1784541543320
+  },
+  "NVO": {
+    "sector": "Pharmaceuticals",
+    "name": "Novo Nordisk A/S",
+    "currency": "DKK",
+    "marketCap": 1488551313000,
+    "fetchedAt": 1784541573223
+  },
+  "APP": {
+    "sector": "Technology",
+    "name": "Applovin Corp",
+    "currency": "USD",
+    "marketCap": 142619968925.95465,
+    "fetchedAt": 1784541543428
+  }
 }

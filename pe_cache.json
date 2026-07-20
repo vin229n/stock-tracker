@@ -4,27 +4,127 @@
     "fetchedAt": 1783946944653
   },
   "AAPL": {
-    "pe": 39.67,
-    "fetchedAt": 1784352834024
+    "pe": 51.34,
+    "fetchedAt": 1784538206207
   },
   "TSLA": {
-    "pe": 358.77,
-    "fetchedAt": 1784352861104
+    "pe": 152.34,
+    "fetchedAt": 1784538176324
   },
   "NVDA": {
-    "pe": 32.56,
-    "fetchedAt": 1784352839292
+    "pe": 67.6,
+    "fetchedAt": 1784538179192
   },
   "MSFT": {
-    "pe": 23.58,
-    "fetchedAt": 1784352865009
+    "pe": 32.82,
+    "fetchedAt": 1784538145898
   },
   "NOW": {
     "pe": 66.36,
     "fetchedAt": 1784129687335
   },
   "MU": {
-    "pe": 20.45,
-    "fetchedAt": 1784352855932
+    "pe": 37,
+    "fetchedAt": 1784538299032
+  },
+  "PERSISTENT.NS": {
+    "pe": 29,
+    "fetchedAt": 1784538150900
+  },
+  "MRVL": {
+    "pe": 16,
+    "fetchedAt": 1784538159342
+  },
+  "LLY": {
+    "pe": 21,
+    "fetchedAt": 1784538169474
+  },
+  "INTU": {
+    "pe": 30,
+    "fetchedAt": 1784538179072
+  },
+  "LULU": {
+    "pe": 32,
+    "fetchedAt": 1784538179308
+  },
+  "AVGO": {
+    "pe": 31,
+    "fetchedAt": 1784538189211
+  },
+  "UBER": {
+    "pe": 22,
+    "fetchedAt": 1784538189429
+  },
+  "ATKR": {
+    "pe": 36,
+    "fetchedAt": 1784538189530
+  },
+  "HOOD": {
+    "pe": 28,
+    "fetchedAt": 1784538199174
+  },
+  "TRENT.NS": {
+    "pe": 17,
+    "fetchedAt": 1784538208979
+  },
+  "MA": {
+    "pe": 17,
+    "fetchedAt": 1784538209254
+  },
+  "AMZN": {
+    "pe": 54.94,
+    "fetchedAt": 1784538255394
+  },
+  "IREN": {
+    "pe": 27,
+    "fetchedAt": 1784538272141
+  },
+  "INTC": {
+    "pe": 37,
+    "fetchedAt": 1784538279257
+  },
+  "NFLX": {
+    "pe": 3.63,
+    "fetchedAt": 1784538279467
+  },
+  "RBRK": {
+    "pe": 20,
+    "fetchedAt": 1784538289806
+  },
+  "AMD": {
+    "pe": 141.65,
+    "fetchedAt": 1784538299325
+  },
+  "SPCX": {
+    "pe": 38,
+    "fetchedAt": 1784538309340
+  },
+  "GOOGL": {
+    "pe": 49.54,
+    "fetchedAt": 1784538319344
+  },
+  "SBICARD.NS": {
+    "pe": 22,
+    "fetchedAt": 1784538329003
+  },
+  "NVO": {
+    "pe": 18,
+    "fetchedAt": 1784538329272
+  },
+  "TTD": {
+    "pe": 36,
+    "fetchedAt": 1784538375858
+  },
+  "ORCL": {
+    "pe": 34,
+    "fetchedAt": 1784538435331
+  },
+  "ADBE": {
+    "pe": 18,
+    "fetchedAt": 1784538495550
+  },
+  "APP": {
+    "pe": 15,
+    "fetchedAt": 1784540142457
   }
 }

@@ -1,7 +1,7 @@
 [
   {
     "symbol": "TRENT.NS",
-    "entryPrice": "2840",
+    "entryPrice": "2700",
     "quantity": "1"
   },
   {
@@ -17,6 +17,121 @@
   {
     "symbol": "ATKR",
     "entryPrice": "57",
+    "quantity": "1"
+  },
+  {
+    "symbol": "SBICARD.NS",
+    "entryPrice": "625",
+    "quantity": "1"
+  },
+  {
+    "symbol": "SPCX",
+    "entryPrice": "70",
+    "quantity": "1"
+  },
+  {
+    "symbol": "INTU",
+    "entryPrice": "265",
+    "quantity": "1"
+  },
+  {
+    "symbol": "MRVL",
+    "entryPrice": "170",
+    "quantity": "1"
+  },
+  {
+    "symbol": "MU",
+    "entryPrice": "700",
+    "quantity": "1"
+  },
+  {
+    "symbol": "AMD",
+    "entryPrice": "350",
+    "quantity": "1"
+  },
+  {
+    "symbol": "NFLX",
+    "entryPrice": "65",
+    "quantity": "1"
+  },
+  {
+    "symbol": "AMZN",
+    "entryPrice": "225",
+    "quantity": "1"
+  },
+  {
+    "symbol": "ADBE",
+    "entryPrice": "220",
+    "quantity": "1"
+  },
+  {
+    "symbol": "RBRK",
+    "entryPrice": "70",
+    "quantity": "1"
+  },
+  {
+    "symbol": "IREN",
+    "entryPrice": "33",
+    "quantity": "1"
+  },
+  {
+    "symbol": "NVDA",
+    "entryPrice": "195",
+    "quantity": "1"
+  },
+  {
+    "symbol": "GOOGL",
+    "entryPrice": "318",
+    "quantity": "1"
+  },
+  {
+    "symbol": "UBER",
+    "entryPrice": "69",
+    "quantity": "1"
+  },
+  {
+    "symbol": "LULU",
+    "entryPrice": "112",
+    "quantity": "1"
+  },
+  {
+    "symbol": "TTD",
+    "entryPrice": "17.39",
+    "quantity": "1"
+  },
+  {
+    "symbol": "LLY",
+    "entryPrice": "1000",
+    "quantity": "1"
+  },
+  {
+    "symbol": "INTC",
+    "entryPrice": "95",
+    "quantity": "1"
+  },
+  {
+    "symbol": "MA",
+    "entryPrice": "520",
+    "quantity": "1"
+  },
+  {
+    "symbol": "NVO",
+    "entryPrice": "47",
+    "quantity": "1"
+  },
+  {
+    "symbol": "HOOD",
+    "entryPrice": "90",
+    "quantity": "1"
+  },
+  {
+    "symbol": "PERSISTENT.NS",
+    "entryPrice": "4650",
+    "quantity": "1"
+  },
+  {
+    "symbol": "APP",
+    "entryPrice": "424.54",
     "quantity": "1"
   }
 ]

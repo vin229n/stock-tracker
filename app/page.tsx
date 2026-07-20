@@ -402,10 +402,10 @@ export default function Home() {
       fetchQuotes(symbolsList);
     }, 0);
 
-    // Setup polling every 10 seconds for quotes
+    // Setup polling every 30 seconds for quotes
     const quotesInterval = setInterval(() => {
       fetchQuotes(symbolsList, true);
-    }, 10000);
+    }, 30000);
 
     return () => {
       clearTimeout(timer);
