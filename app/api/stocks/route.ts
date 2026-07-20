@@ -35,6 +35,12 @@ function writeLocalStocks(stocks: any[]) {
   }
 }
 
+const NO_CACHE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+  "Pragma": "no-cache",
+  "Expires": "0",
+};
+
 export async function GET() {
   try {
     const response = await fetch(GOOGLE_SHEET_APPSCRIPT_URL, {
@@ -54,16 +60,22 @@ export async function GET() {
     // Cache successfully fetched stocks locally
     writeLocalStocks(stocks);
 
-    return NextResponse.json({ stocks, source: "google_sheets", configured: true });
+    return NextResponse.json(
+      { stocks, source: "google_sheets", configured: true },
+      { headers: NO_CACHE_HEADERS }
+    );
   } catch (error: any) {
     console.error("Error fetching stocks from Google Sheets, using local fallback:", error);
     const stocks = readLocalStocks();
-    return NextResponse.json({
-      stocks,
-      source: "local_fallback_on_error",
-      configured: true,
-      error: error.message,
-    });
+    return NextResponse.json(
+      {
+        stocks,
+        source: "local_fallback_on_error",
+        configured: true,
+        error: error.message,
+      },
+      { headers: NO_CACHE_HEADERS }
+    );
   }
 }
 

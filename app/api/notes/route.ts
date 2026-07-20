@@ -58,16 +58,22 @@ function writeNotes(notes: NormalizedStockNotes) {
   }
 }
 
+const NO_CACHE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+  "Pragma": "no-cache",
+  "Expires": "0",
+};
+
 export async function GET() {
   try {
     const notes = readNotes();
-    return NextResponse.json({ notes });
+    return NextResponse.json({ notes }, { headers: NO_CACHE_HEADERS });
   } catch (error) {
     console.error("Error fetching notes:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
       { error: "Failed to read notes: " + message },
-      { status: 500 }
+      { status: 500, headers: NO_CACHE_HEADERS }
     );
   }
 }

@@ -230,7 +230,7 @@ export default function Home() {
       setLoading(true);
       setSyncError(null);
       try {
-        const res = await fetch("/api/stocks");
+        const res = await fetch(`/api/stocks?t=${Date.now()}`, { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
           setSyncConfigured(data.configured);
@@ -259,7 +259,7 @@ export default function Home() {
 
     const loadNotes = async () => {
       try {
-        const res = await fetch("/api/notes");
+        const res = await fetch(`/api/notes?t=${Date.now()}`, { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
           if (data.notes) {
@@ -331,7 +331,7 @@ export default function Home() {
 
     try {
       const symbols = symbolsToFetch.join(",");
-      const response = await fetch(`/api/stock?symbols=${symbols}&stream=true`);
+      const response = await fetch(`/api/stock?symbols=${symbols}&stream=true&_t=${Date.now()}`, { cache: "no-store" });
       if (!response.ok) throw new Error("Failed to fetch quotes");
 
       if (response.body) {
@@ -404,7 +404,7 @@ export default function Home() {
     if (!symbolsToFetch || symbolsToFetch.length === 0) return;
     try {
       const symbols = symbolsToFetch.join(",");
-      const response = await fetch(`/api/stock?symbols=${symbols}`);
+      const response = await fetch(`/api/stock?symbols=${symbols}&_t=${Date.now()}`, { cache: "no-store" });
       if (!response.ok) throw new Error("Failed to fetch tape quotes");
       const data = await response.json();
       const tapeQuotesMap: Record<string, StockQuote> = {};
@@ -422,7 +422,7 @@ export default function Home() {
     setRefreshing(true);
     setSyncError(null);
     try {
-      const res = await fetch("/api/stocks");
+      const res = await fetch(`/api/stocks?_t=${Date.now()}`, { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         setSyncConfigured(data.configured);
