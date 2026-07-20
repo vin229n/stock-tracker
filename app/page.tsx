@@ -99,6 +99,17 @@ const deduplicateStocks = (stocks: TrackedStock[]): TrackedStock[] => {
   });
 };
 
+const getTradingViewUrl = (symbol: string): string => {
+  const s = symbol.toUpperCase();
+  if (s.endsWith(".NS")) {
+    return `https://www.tradingview.com/chart/?symbol=NSE:${encodeURIComponent(s.replace(".NS", ""))}`;
+  }
+  if (s.endsWith(".BO")) {
+    return `https://www.tradingview.com/chart/?symbol=BSE:${encodeURIComponent(s.replace(".BO", ""))}`;
+  }
+  return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(s)}`;
+};
+
 export default function Home() {
   const [mounted, setMounted] = useState(false);
   const [trackedStocks, setTrackedStocks] = useState<TrackedStock[]>([]);
@@ -1494,19 +1505,23 @@ export default function Home() {
                                 )}
                               </td>
 
-                              {/* Sparkline Chart - Click opens TradingView */}
-                              <td
-                                className="py-4 px-3 cursor-pointer select-none flex items-center justify-center group/trend"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedSymbol(stock.symbol);
-                                  window.open(`https://www.tradingview.com/chart/?symbol=${stock.symbol.toUpperCase()}`, "_blank", "noopener,noreferrer");
-                                }}
-                                title={`Open ${stock.symbol} chart on TradingView`}
-                              >
-                                <div className="transition-transform duration-200 group-hover/trend:scale-105">
-                                  {renderSparkline(stock.symbol, sparklines[stock.symbol])}
-                                </div>
+                              {/* TradingView Chart Button */}
+                              <td className="py-4 px-3 text-center">
+                                <a
+                                  href={getTradingViewUrl(stock.symbol)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-indigo-600/25 text-indigo-400 hover:text-indigo-300 border border-slate-700/60 hover:border-indigo-500/50 transition-all duration-150 shadow-sm hover:shadow-indigo-500/20 group/tv"
+                                  title={`Open ${stock.symbol} chart on TradingView`}
+                                >
+                                  <svg className="w-4 h-4 transition-transform duration-200 group-hover/tv:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a.5.5 0 00.71 0l7.234-7.234M21 8.25V12m0-3.75h-3.75" />
+                                  </svg>
+                                  <svg className="w-3 h-3 opacity-60 group-hover/tv:opacity-100 group-hover/tv:translate-x-0.5 group-hover/tv:-translate-y-0.5 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H18m0 0v4.5m0-4.5L11.25 12.75" />
+                                  </svg>
+                                </a>
                               </td>
 
                               {/* Actions Delete button */}
@@ -1632,18 +1647,24 @@ export default function Home() {
                               )}
                             </div>
 
-                            {/* Sparkline */}
+                            {/* TradingView Chart Button */}
                             <div className="flex flex-col items-end">
                               <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-0.5">Trend</span>
-                              <div
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedSymbol(stock.symbol);
-                                  window.open(`https://www.tradingview.com/chart/?symbol=${stock.symbol.toUpperCase()}`, "_blank", "noopener,noreferrer");
-                                }}
+                              <a
+                                href={getTradingViewUrl(stock.symbol)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-800/80 hover:bg-indigo-600/25 text-indigo-400 hover:text-indigo-300 border border-slate-700/60 hover:border-indigo-500/50 transition-all group/tv"
+                                title={`Open ${stock.symbol} chart on TradingView`}
                               >
-                                {renderSparkline(stock.symbol, sparklines[stock.symbol])}
-                              </div>
+                                <svg className="w-3.5 h-3.5 transition-transform duration-200 group-hover/tv:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a.5.5 0 00.71 0l7.234-7.234M21 8.25V12m0-3.75h-3.75" />
+                                </svg>
+                                <svg className="w-3 h-3 opacity-60 group-hover/tv:opacity-100 group-hover/tv:translate-x-0.5 group-hover/tv:-translate-y-0.5 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H18m0 0v4.5m0-4.5L11.25 12.75" />
+                                </svg>
+                              </a>
                             </div>
                           </div>
 
