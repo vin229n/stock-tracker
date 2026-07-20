@@ -1071,13 +1071,13 @@ export default function Home() {
   return (
     <div className={`flex-1 flex flex-col font-sans min-h-screen transition-colors duration-300 ${
       theme === "light"
-        ? "bg-slate-50 text-slate-900 selection:bg-indigo-500 selection:text-white"
+        ? "bg-gradient-to-br from-slate-200 via-slate-100 to-zinc-200 text-slate-900 selection:bg-indigo-500 selection:text-white"
         : "bg-[#0a0f1d] text-slate-100 selection:bg-indigo-500 selection:text-white"
     }`}>
       {/* Ticker Tape */}
       <div className={`w-full overflow-hidden h-10 flex items-center border-b transition-colors ${
         theme === "light"
-          ? "bg-white border-slate-200/90 text-slate-800 shadow-xs"
+          ? "bg-slate-100/90 backdrop-blur-md border-slate-300/80 text-slate-800 shadow-xs"
           : "bg-[#0d1428] border-slate-800/60 text-slate-100"
       }`}>
         <div className="animate-ticker whitespace-nowrap flex items-center">
@@ -1244,7 +1244,7 @@ export default function Home() {
             {/* Add Stock Search Container */}
             <div className={`p-6 border rounded-2xl transition-all duration-300 flex flex-col gap-4 relative ${
               theme === "light"
-                ? "bg-white border-slate-200/90 shadow-xs text-slate-900"
+                ? "bg-slate-100/90 border-slate-300/80 shadow-sm backdrop-blur-md text-slate-900"
                 : "bg-slate-900/45 border-slate-800/80 text-slate-100 backdrop-blur-md shadow-lg"
             }`}>
               <h2 className={`text-lg font-bold flex items-center gap-2 ${theme === "light" ? "text-slate-900" : "text-slate-200"}`}>
@@ -1377,7 +1377,7 @@ export default function Home() {
             {/* Tracked Stocks List Grid */}
             <div className={`p-0 md:p-6 transition-all duration-300 border-0 md:border rounded-none md:rounded-2xl ${
               theme === "light"
-                ? "md:bg-white md:border-slate-200/90 md:shadow-xs text-slate-900"
+                ? "md:bg-slate-100/90 md:border-slate-300/80 md:shadow-sm md:backdrop-blur-md text-slate-900"
                 : "md:bg-slate-900/45 md:border-slate-800/80 md:backdrop-blur-md md:shadow-lg text-slate-100"
             }`}>
               <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 ${
@@ -1894,7 +1894,7 @@ export default function Home() {
                                 ? "bg-indigo-50/90 border-indigo-300 shadow-md shadow-indigo-100"
                                 : "bg-indigo-950/20 border-indigo-500/60 shadow-indigo-500/5 shadow-md"
                               : theme === "light"
-                              ? "bg-white border-slate-200/90 shadow-md shadow-slate-200/60 hover:shadow-lg hover:border-slate-300"
+                              ? "bg-slate-50 border-slate-300/80 shadow-md shadow-slate-300/40 hover:shadow-lg hover:border-slate-400"
                               : "bg-slate-900/30 border-slate-800/60 hover:bg-slate-800/10"
                           }`}
                         >
