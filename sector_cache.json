@@ -243,5 +243,12 @@
     "currency": "USD",
     "marketCap": 1110416736866.6304,
     "fetchedAt": 1784550734897
+  },
+  "RKLB": {
+    "sector": "Aerospace & Defense",
+    "name": "Rocket Lab Corp",
+    "currency": "USD",
+    "marketCap": 41238542993.0976,
+    "fetchedAt": 1784684659578
   }
 }

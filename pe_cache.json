@@ -1,122 +1,126 @@
 {
   "NVO": {
-    "pe": 9.17,
-    "fetchedAt": 1784550616932
+    "pe": 11.99,
+    "fetchedAt": 1784684729853
   },
   "AAPL": {
-    "pe": 39.99,
-    "fetchedAt": 1784550640319
+    "pe": 39.17,
+    "fetchedAt": 1784684654572
   },
   "ATKR": {
-    "pe": 13.81,
-    "fetchedAt": 1784550644326
+    "pe": 14.02,
+    "fetchedAt": 1784684903832
   },
   "SPCX": {
     "pe": 38,
-    "fetchedAt": 1784550644339
+    "fetchedAt": 1784684688108
   },
   "ORCL": {
-    "pe": 21.31,
-    "fetchedAt": 1784550644343
+    "pe": 21.24,
+    "fetchedAt": 1784684789229
   },
   "INTU": {
-    "pe": 17.37,
-    "fetchedAt": 1784550644345
+    "pe": 17.25,
+    "fetchedAt": 1784684687578
   },
   "MU": {
-    "pe": 19,
-    "fetchedAt": 1784550644536
+    "pe": 21.28,
+    "fetchedAt": 1784684821425
   },
   "NVDA": {
-    "pe": 30.75,
-    "fetchedAt": 1784550644565
+    "pe": 69.1,
+    "fetchedAt": 1784684700119
   },
   "AVGO": {
-    "pe": 60.18,
-    "fetchedAt": 1784550644546
+    "pe": 62.72,
+    "fetchedAt": 1784684874413
   },
   "MRVL": {
-    "pe": 65.4,
-    "fetchedAt": 1784550644581
+    "pe": 16,
+    "fetchedAt": 1784684759241
   },
   "ADBE": {
-    "pe": 13.05,
-    "fetchedAt": 1784550644586
+    "pe": 12.91,
+    "fetchedAt": 1784684818690
   },
   "IREN": {
-    "pe": 156.2,
-    "fetchedAt": 1784550644597
+    "pe": 190.61,
+    "fetchedAt": 1784684933645
   },
   "TRENT.NS": {
     "pe": 17,
-    "fetchedAt": 1784550644331
+    "fetchedAt": 1784684658883
   },
   "PERSISTENT.NS": {
     "pe": 29,
-    "fetchedAt": 1784550644755
+    "fetchedAt": 1784684845133
   },
   "TSLA": {
-    "pe": 370.36,
-    "fetchedAt": 1784550671066
+    "pe": 359.4,
+    "fetchedAt": 1784684670257
   },
   "MSFT": {
-    "pe": 23.36,
-    "fetchedAt": 1784550671124
+    "pe": 23.71,
+    "fetchedAt": 1784684684148
   },
   "NFLX": {
-    "pe": 21.03,
-    "fetchedAt": 1784550674850
+    "pe": 20.78,
+    "fetchedAt": 1784684922596
   },
   "AMD": {
-    "pe": 161.39,
-    "fetchedAt": 1784550674916
+    "pe": 176.34,
+    "fetchedAt": 1784684675577
   },
   "LLY": {
-    "pe": 43.93,
-    "fetchedAt": 1784550675135
+    "pe": 21,
+    "fetchedAt": 1784684704807
   },
   "TTD": {
-    "pe": 20.2,
-    "fetchedAt": 1784550675209
+    "pe": 19.75,
+    "fetchedAt": 1784684932842
   },
   "APP": {
     "pe": 35.99,
     "fetchedAt": 1784550675249
   },
   "LULU": {
-    "pe": 9.46,
-    "fetchedAt": 1784550675273
+    "pe": 9.36,
+    "fetchedAt": 1784684820279
   },
   "RBRK": {
-    "pe": 254.82,
-    "fetchedAt": 1784550675295
+    "pe": 246.59,
+    "fetchedAt": 1784684963423
   },
   "SBICARD.NS": {
     "pe": 22,
-    "fetchedAt": 1784550674630
+    "fetchedAt": 1784684982000
   },
   "GOOGL": {
-    "pe": 26.33,
-    "fetchedAt": 1784550704744
+    "pe": 49.59,
+    "fetchedAt": 1784684833044
   },
   "MA": {
-    "pe": 30.85,
-    "fetchedAt": 1784550704760
+    "pe": 30.6,
+    "fetchedAt": 1784684905336
   },
   "INTC": {
     "pe": 101.64,
-    "fetchedAt": 1784550704869
+    "fetchedAt": 1784684717753
   },
   "UBER": {
-    "pe": 17.27,
-    "fetchedAt": 1784550704893
+    "pe": 17.1,
+    "fetchedAt": 1784684952129
   },
   "HOOD": {
-    "pe": 47.45,
-    "fetchedAt": 1784550704911
+    "pe": 50.5,
+    "fetchedAt": 1784684659353
   },
   "AMZN": {
-    "pe": 29.29,
-    "fetchedAt": 1784550704982
+    "pe": 55.01,
+    "fetchedAt": 1784684825130
+  },
+  "RKLB": {
+    "pe": 24,
+    "fetchedAt": 1784684659578
   }
 }

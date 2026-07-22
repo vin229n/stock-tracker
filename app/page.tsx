@@ -139,6 +139,54 @@ const IndiaFlag = ({ className = "w-4 h-3 rounded-[2px] shadow-sm inline-block s
   </svg>
 );
 
+const StockIcon = ({ symbol, name, size = 10, theme }: { symbol: string, name?: string, size?: number, theme: "light" | "dark" }) => {
+  const [hasError, setHasError] = React.useState(false);
+  const cleanSymbol = symbol.split(".")[0].split("-")[0].toUpperCase();
+
+  const colors = React.useMemo(() => {
+    let hash = 0;
+    for (let i = 0; i < cleanSymbol.length; i++) {
+      hash = cleanSymbol.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = Math.abs(hash % 360);
+    return {
+      bg: `hsl(${hue}, 70%, ${theme === "light" ? "90%" : "20%"})`,
+      text: `hsl(${hue}, 80%, ${theme === "light" ? "40%" : "85%"})`,
+    };
+  }, [cleanSymbol, theme]);
+
+  if (hasError || !cleanSymbol) {
+    return (
+      <div
+        className="flex items-center justify-center font-extrabold rounded-lg shrink-0 select-none"
+        style={{
+          width: `${size * 4}px`,
+          height: `${size * 4}px`,
+          backgroundColor: colors.bg,
+          color: colors.text,
+          fontSize: `${size * 1.5}px`,
+        }}
+      >
+        {cleanSymbol.charAt(0)}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={`/api/stock/logo?symbol=${cleanSymbol}`}
+      alt={`${name || symbol} logo`}
+      className="rounded-lg bg-white shrink-0 object-contain p-0.5 border"
+      style={{
+        width: `${size * 4}px`,
+        height: `${size * 4}px`,
+        borderColor: theme === "light" ? "#e2e8f0" : "#1e293b",
+      }}
+      onError={() => setHasError(true)}
+    />
+  );
+};
+
 export default function Home() {
   const [mounted, setMounted] = useState(false);
   const [trackedStocks, setTrackedStocks] = useState<TrackedStock[]>([]);
@@ -1642,27 +1690,30 @@ export default function Home() {
                                 onClick={() => setSelectedSymbol(stock.symbol)}
                                 className="py-4 px-3 cursor-pointer select-none"
                               >
-                                <div className="flex flex-col">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className={`font-bold transition-colors ${
-                                      theme === "light" ? "text-slate-900 group-hover:text-indigo-600" : "text-slate-100 group-hover:text-indigo-400"
-                                    }`}>
-                                      {stock.symbol}
-                                    </span>
-                                    {notes[stock.symbol] && notes[stock.symbol].length > 0 && (
-                                      <span
-                                        className="text-indigo-500 hover:text-indigo-600 flex items-center"
-                                        title={`${notes[stock.symbol].length} comment(s) tracked`}
-                                      >
-                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                                        </svg>
+                                <div className="flex items-center gap-2.5">
+                                  <StockIcon symbol={stock.symbol} name={quote?.name} theme={theme} size={9} />
+                                  <div className="flex flex-col min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className={`font-bold transition-colors ${
+                                        theme === "light" ? "text-slate-900 group-hover:text-indigo-600" : "text-slate-100 group-hover:text-indigo-400"
+                                      }`}>
+                                        {stock.symbol}
                                       </span>
-                                    )}
+                                      {notes[stock.symbol] && notes[stock.symbol].length > 0 && (
+                                        <span
+                                          className="text-indigo-500 hover:text-indigo-600 flex items-center"
+                                          title={`${notes[stock.symbol].length} comment(s) tracked`}
+                                        >
+                                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                                          </svg>
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className={`text-xs truncate max-w-xs mt-0.5 ${theme === "light" ? "text-slate-500" : "text-slate-400"}`}>
+                                      {quote?.name || "Loading..."}
+                                    </span>
                                   </div>
-                                  <span className={`text-xs truncate max-w-xs mt-0.5 ${theme === "light" ? "text-slate-500" : "text-slate-400"}`}>
-                                    {quote?.name || "Loading..."}
-                                  </span>
                                 </div>
                               </td>
 
@@ -1899,31 +1950,34 @@ export default function Home() {
                           }`}
                         >
                           {/* Mobile card header */}
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <div className="flex items-center gap-1.5">
-                                <span className={`font-bold text-sm ${theme === "light" ? "text-slate-900" : "text-slate-100"}`}>
-                                  {stock.symbol}
+                          <div className="flex justify-between items-start gap-3">
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              <StockIcon symbol={stock.symbol} name={quote?.name} theme={theme} size={9} />
+                              <div className="min-w-0 flex-1">
+                                <span className={`font-bold text-sm block truncate max-w-[180px] ${theme === "light" ? "text-slate-900" : "text-slate-100"}`}>
+                                  {quote?.name || "Loading..."}
                                 </span>
-                                {notes[stock.symbol] && notes[stock.symbol].length > 0 && (
-                                  <span
-                                    className="text-indigo-500 flex items-center"
-                                    title={`${notes[stock.symbol].length} comment(s) tracked`}
-                                  >
-                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                                    </svg>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className={`text-xs font-semibold ${theme === "light" ? "text-slate-500" : "text-slate-400"}`}>
+                                    {stock.symbol}
                                   </span>
-                                )}
-                                {quote?.sector && (
-                                  <span className="text-[9px] text-indigo-500 font-mono font-bold bg-indigo-500/10 px-1.5 py-0.5 rounded">
-                                    {quote.sector}
-                                  </span>
-                                )}
+                                  {notes[stock.symbol] && notes[stock.symbol].length > 0 && (
+                                    <span
+                                      className="text-indigo-500 flex items-center"
+                                      title={`${notes[stock.symbol].length} comment(s) tracked`}
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                                      </svg>
+                                    </span>
+                                  )}
+                                  {quote?.sector && (
+                                    <span className="text-[9px] text-indigo-500 font-mono font-bold bg-indigo-500/10 px-1.5 py-0.5 rounded">
+                                      {quote.sector}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
-                              <span className={`text-xs block truncate max-w-[180px] mt-0.5 ${theme === "light" ? "text-slate-500" : "text-slate-400"}`}>
-                                {quote?.name || "Loading..."}
-                              </span>
                             </div>
 
                             <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
@@ -2219,17 +2273,20 @@ export default function Home() {
             </button>
 
             {/* Modal Header */}
-            <div className="flex flex-col pr-8">
-              <div className="flex flex-wrap items-baseline gap-2">
-                <span className={`text-2xl font-extrabold tracking-tight ${theme === "light" ? "text-slate-900" : "text-slate-100"}`}>{selectedSymbol}</span>
-                <span className="text-[10px] uppercase text-indigo-500 font-mono tracking-wider font-bold bg-indigo-500/10 px-2 py-0.5 rounded-md">
-                  {quotes[selectedSymbol]?.name ? "Active Quote" : "Selected"}
+            <div className="flex items-center gap-3.5 pr-8">
+              <StockIcon symbol={selectedSymbol} name={quotes[selectedSymbol]?.name} theme={theme} size={12} />
+              <div className="flex flex-col min-w-0">
+                <div className="flex flex-wrap items-baseline gap-2">
+                  <span className={`text-2xl font-extrabold tracking-tight ${theme === "light" ? "text-slate-900" : "text-slate-100"}`}>{selectedSymbol}</span>
+                  <span className="text-[10px] uppercase text-indigo-500 font-mono tracking-wider font-bold bg-indigo-500/10 px-2 py-0.5 rounded-md">
+                    {quotes[selectedSymbol]?.name ? "Active Quote" : "Selected"}
+                  </span>
+                </div>
+                <span className={`text-xs font-medium mt-1 truncate ${theme === "light" ? "text-slate-500" : "text-slate-400"}`}>
+                  {quotes[selectedSymbol]?.name || "Loading metadata..."}
+                  {quotes[selectedSymbol]?.sector && ` • ${quotes[selectedSymbol].sector}`}
                 </span>
               </div>
-              <span className={`text-xs font-medium mt-1 truncate ${theme === "light" ? "text-slate-500" : "text-slate-400"}`}>
-                {quotes[selectedSymbol]?.name || "Loading metadata..."}
-                {quotes[selectedSymbol]?.sector && ` • ${quotes[selectedSymbol].sector}`}
-              </span>
             </div>
 
             {/* Price Chart Panel */}
