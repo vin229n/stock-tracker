@@ -13,11 +13,19 @@ export async function GET(request: NextRequest) {
 
 
     const cleanSymbol = symbol.split(".")[0].split("-")[0];
-    const logoDir = path.join(process.cwd(), "public", "logos");
+    
+    // On Vercel, use /tmp for caching since the root filesystem is read-only.
+    const logoDir = process.env.VERCEL
+      ? path.join("/tmp", "logos")
+      : path.join(process.cwd(), "public", "logos");
 
-    // Ensure local logos folder exists
-    if (!fs.existsSync(logoDir)) {
-      fs.mkdirSync(logoDir, { recursive: true });
+    // Ensure logos folder exists
+    try {
+      if (!fs.existsSync(logoDir)) {
+        fs.mkdirSync(logoDir, { recursive: true });
+      }
+    } catch (dirErr) {
+      console.error("Failed to create logos directory:", dirErr);
     }
 
     const logoPath = path.join(logoDir, `${cleanSymbol}.png`);
