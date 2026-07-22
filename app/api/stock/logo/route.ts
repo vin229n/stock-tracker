@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
       return new NextResponse("Symbol is required", { status: 400 });
     }
 
+
     const cleanSymbol = symbol.split(".")[0].split("-")[0];
     const logoDir = path.join(process.cwd(), "public", "logos");
 
